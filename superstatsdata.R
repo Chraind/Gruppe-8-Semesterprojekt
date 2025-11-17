@@ -1,5 +1,4 @@
-pacman::p_load(tidyverse, ggthemes, ggridges, janitor, vroom, arrow, readxl, writexl, purrr, 
-               stringi, hms, tidymodels, MASS, tseries, ggfortify, polite, tufte, rvest, lubridate)
+pacman::p_load(tidyverse, janitor, rvest, lubridate, stringi, purrr)
 ###
 ### Find de år hvor VFF er i superligaen
 ###
@@ -74,17 +73,7 @@ for (i in seq_along(sæson_urls)) {
           tilskuere = as.numeric(tilskuere)
         )
     }
-    
-    # Parse date
-#    if ("dato" %in% names(df)) {
-#      df <- df %>%
-#       mutate(
-#          dato = paste0(dato,"/",individuel_sæson),
-#          dato = gsub("([0-9]{2}/[0-9]{2}) ([0-9]{2}:[0-9]{2})/([0-9]{4})","\\1/\\3 \\2",dato),
-#          dato = suppressWarnings(lubridate::dmy_hm(dato))
-#        )
-#    }
-    
+
     # Remove unwanted columns (7 and 9) safely
     cols_to_remove <- intersect(c(7,9), seq_along(df))
     if (length(cols_to_remove) > 0) df <- df[,-cols_to_remove]

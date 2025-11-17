@@ -1,4 +1,4 @@
-pacman::p_load(tidyverse, janitor, rvest, lubridate, stringi, purrr)
+pacman::p_load(tidyverse, janitor, rvest, lubridate, stringi, httr, jsonlite, purrr)
 
 ### Find de år hvor VFF er i superligaen
 superliga_url <- "https://superstats.dk/hold/alltime?id=11"
@@ -73,14 +73,23 @@ for (i in seq_along(sæson_urls)) {
 })
 
 # Gem RDS så man ikke ddos'er superstats, da man kun behøver køre ovenstående kode når man vil have opdateret tabel
-saveRDS(kombineret_runde_table, "kombineret_runde_table.rds")
+SaveRDS(kombineret_runde_table, "kombineret_runde_table.rds")
 
 # Load RDS
 kombineret_runde_table <- readRDS("kombineret_runde_table.rds")
 
-view(kombineret_runde_table)
 
 # TODO: upload scraped data til SQL databasen
+
+# ---- date.nager.at data hentning ----
+alle_helligdage <- tibble()
+for (year in sæson_år) {
+  url <- paste0("https://date.nager.at/api/v3/PublicHolidays/", year, "/DK")
+  response <- GET(url)
+  helligdage <- fromJSON(content(response, "text", encoding = "UTF-8"))
+  alle_helligdage <- bind_rows(alle_helligdage, helligdage)
+  Sys.sleep(1)
+}
 
 # ---- DATARENSNING ----
 vff_kampdata_clean <- kombineret_runde_table %>%
@@ -116,18 +125,21 @@ vff_kampdata_clean <- kombineret_runde_table %>%
   mutate (
     match_dato = dmy(paste0(dato, "/", år))
   ) %>% 
+  
+  # Indsættelse af helligdag data fra date.nager.at og ser om datoen matcher match_dato
+  mutate(
+    helligdag = match_dato %in% as.Date(alle_helligdage$date)
+  ) %>% 
+  
   # Fjern unødvendige kolonner
 dplyr::select(-delete, -month, -end_year) %>%
   
   # Omorganiser kolonner
-dplyr::select(sæson, år, ugedag, dato, tid, matchup, stilling, tilskuere, dommer, tv_kanal, match_dato)
+dplyr::select(sæson, år, ugedag, dato, tid, matchup, stilling, tilskuere, dommer, tv_kanal, match_dato, helligdag)
 
 # Se resultatet
 view(vff_kampdata_clean)
 str(vff_kampdata_clean)
-
-
-
 
 
 
