@@ -76,14 +76,14 @@ for (i in seq_along(sæson_urls)) {
     }
     
     # Parse date
-    if ("dato" %in% names(df)) {
-      df <- df %>%
-        mutate(
-          dato = paste0(dato,"/",individuel_sæson),
-          dato = gsub("([0-9]{2}/[0-9]{2}) ([0-9]{2}:[0-9]{2})/([0-9]{4})","\\1/\\3 \\2",dato),
-          dato = suppressWarnings(lubridate::dmy_hm(dato))
-        )
-    }
+#    if ("dato" %in% names(df)) {
+#      df <- df %>%
+#       mutate(
+#          dato = paste0(dato,"/",individuel_sæson),
+#          dato = gsub("([0-9]{2}/[0-9]{2}) ([0-9]{2}:[0-9]{2})/([0-9]{4})","\\1/\\3 \\2",dato),
+#          dato = suppressWarnings(lubridate::dmy_hm(dato))
+#        )
+#    }
     
     # Remove unwanted columns (7 and 9) safely
     cols_to_remove <- intersect(c(7,9), seq_along(df))
@@ -107,7 +107,7 @@ view(kombineret_runde_table)
 
 # TODO: upload scraped data til SQL databasen
 
-#save
+
 
 
 
