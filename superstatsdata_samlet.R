@@ -51,7 +51,7 @@ for (i in seq_along(sæson_urls)) {
     
     # Clean names & rename, indsæt kolonnenavne
     df <- df %>% clean_names()
-    col_names <- c("ugedag","dato","matchup","stilling","tilskuere","dommer","delete","tv_kanal","sæson")
+    col_names <- c("ugedag","dato","kamp","stilling","tilskuere","dommer","delete","tv_kanal","sæson")
     names(df)[1:min(length(col_names), ncol(df))] <- col_names[1:min(length(col_names), ncol(df))]
     
     # Fix Tilskuere, fjern punktum
@@ -72,14 +72,13 @@ for (i in seq_along(sæson_urls)) {
   cat(" Fejl ved hentning af data for", year, ":", e$message, "\n")  
 })
 
+# TODO: upload scraped data til SQL databasen
+
 # Gem RDS så man ikke ddos'er superstats, da man kun behøver køre ovenstående kode når man vil have opdateret tabel
-SaveRDS(kombineret_runde_table, "kombineret_runde_table.rds")
+saveRDS(kombineret_runde_table, "alt_superstats_data.rds")
 
 # Load RDS
-kombineret_runde_table <- readRDS("kombineret_runde_table.rds")
-
-
-# TODO: upload scraped data til SQL databasen
+alt_superstats_data <- readRDS("alt_superstats_data.rds")
 
 # ---- date.nager.at data hentning ----
 alle_helligdage <- tibble()
@@ -97,10 +96,10 @@ vff_kampdata_clean <- kombineret_runde_table %>%
   separate(dato, into = c("dato", "tid"), sep = " ", remove = FALSE) %>%
   
   # Identificer VFF hjemmekampe
-  # Hjemmeholdet står først i "matchup" kolonnen (f.eks. "VFF-FCK" eller "Viborg FF - FCK")
+  # Hjemmeholdet står først i "kamp" kolonnen (f.eks. "VFF-FCK" eller "Viborg FF - FCK")
   mutate(
     # Tjek om VFF/Viborg er hjemmehold (står før bindestreg)
-    vff_hjemme = grepl("^(VFF|Viborg)", matchup, ignore.case = TRUE)
+    vff_hjemme = grepl("^(VFF|Viborg)", kamp, ignore.case = TRUE)
   ) %>%
   
   # Filtrer kun VFF hjemmekampe
@@ -121,26 +120,37 @@ vff_kampdata_clean <- kombineret_runde_table %>%
     år = ifelse(month >= 7 & month <= 12, end_year - 1, end_year)
   ) %>%
   
-  # Tilføj match_dato
+  # Tilføj kamp_dato
   mutate (
-    match_dato = dmy(paste0(dato, "/", år))
+    kamp_dato = dmy(paste0(dato, "/", år))
   ) %>% 
   
-  # Indsættelse af helligdag data fra date.nager.at og ser om datoen matcher match_dato
+  # Indsættelse af helligdag data fra date.nager.at og ser om datoen matcher kamp_dato
   mutate(
-    helligdag = match_dato %in% as.Date(alle_helligdage$date)
+    helligdag = kamp_dato %in% as.Date(alle_helligdage$date)
   ) %>% 
+
+# Tilføj tids kolonne, tidligt midt sent
+# Tilføj hvem der vandt sidst kolonne
+# Tilføj runde kolonne,
+# Tilføj lokale events kolonne (smukfest uge 32)
   
-  # Fjern unødvendige kolonner
-dplyr::select(-delete, -month, -end_year) %>%
+# Fjern unødvendige kolonner
+  dplyr::select(-delete, -month, -end_year) %>%
   
-  # Omorganiser kolonner
-dplyr::select(sæson, år, ugedag, dato, tid, matchup, stilling, tilskuere, dommer, tv_kanal, match_dato, helligdag)
+# Omorganiser kolonner
+  dplyr::select(sæson, år, ugedag, dato, tid, kamp, stilling, tilskuere, dommer, tv_kanal, kamp_dato, helligdag)
 
 # Se resultatet
 view(vff_kampdata_clean)
 str(vff_kampdata_clean)
 
+
+# Gem RDS så man ikke ddos'er superstats, da man kun behøver køre ovenstående kode når man vil have opdateret tabel
+saveRDS(vff_kampdata_clean, "vff_kampdata_clean.rds")
+
+# Load RDS
+vff_kampdata_clean <- readRDS("vff_kampdata_clean.rds")
 
 
 
