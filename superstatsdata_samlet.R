@@ -1,4 +1,4 @@
-pacman::p_load(tidyverse, janitor, rvest, lubridate, stringi, httr, jsonlite, purrr)
+pacman::p_load(tidyverse, vroom, janitor, polite, rjstat, rvest, lubridate, stringi, httr, jsonlite, purrr, utils)
 
 ### Find de år hvor VFF er i superligaen
 superliga_url <- "https://superstats.dk/hold/alltime?id=11"
@@ -90,6 +90,58 @@ for (year in sæson_år) {
   Sys.sleep(1)
 }
 
+# === HENT BEFOLKNINGSDATA FRA DANMARKS STATISTIK ===
+# Definer URLs
+urls <- list(
+  for_2005 = "https://api.statbank.dk/v1/data/bef1a/JSONSTAT?OMRÅDE=791%2C761%2C763%2C769%2C775%2C789&Tid=2002%2C2003%2C2004",
+  aar_2005_2007 = "https://api.statbank.dk/v1/data/bef1a07/JSONSTAT?OMRÅDE=791&Tid=2005%2C2006%2C2007",
+  efter_2008 = "https://api.statbank.dk/v1/data/folk1a/JSONSTAT?OMRÅDE=791&KØN=TOT&ALDER=IALT&CIVILSTAND=TOT&Tid=2008K1%2C2008K2%2C2008K3%2C2008K4%2C2013K1%2C2013K2%2C2013K3%2C2013K4%2C2014K1%2C2014K2%2C2014K3%2C2014K4%2C2015K1%2C2015K2%2C2015K3%2C2015K4%2C2016K1%2C2016K2%2C2016K3%2C2016K4%2C2017K1%2C2017K2%2C2017K3%2C2017K4%2C2021K1%2C2021K2%2C2021K3%2C2021K4%2C2022K1%2C2022K2%2C2022K3%2C2022K4%2C2023K1%2C2023K2%2C2023K3%2C2023K4%2C2024K1%2C2024K2%2C2024K3%2C2024K4%2C2025K1%2C2025K2%2C2025K3%2C2025K4"
+)
+
+# Hent og bearbejd data for 2003-2004 (skal summeres da Kommunen var opdelt anderledes den gang)
+stat_viborg_for_2005 <- fromJSONstat(urls$for_2005) %>%
+  as_tibble() %>%
+  pull(1) %>%
+  group_by(tid) %>%
+  summarise(value = sum(value, na.rm = TRUE)) %>%
+  mutate(
+    aar = as.character(tid),
+    kvartal = as.character(NA)
+  ) %>%
+  dplyr::select(aar, kvartal, value)
+
+# Hent og bearbejd data for 2005-2007
+stat_viborg_2005_2007 <- fromJSONstat(urls$aar_2005_2007) %>%
+  as_tibble() %>%
+  pull(1) %>%
+  dplyr::select(tid, value) %>%
+  mutate(
+    aar = as.character(tid),
+    kvartal = as.character(NA)
+  ) %>%
+  dplyr::select(aar, kvartal, value)
+
+# Hent og bearbejd data efter 2008 (nu med kvartals optælling)
+stat_viborg_efter_2008 <- fromJSONstat(urls$efter_2008) %>%
+  as_tibble() %>%
+  pull(1) %>%
+  dplyr::select(tid, value) %>%
+  mutate(
+    aar = str_extract(tid, "^\\d{4}"),
+    kvartal = str_extract(tid, "K\\d")
+  ) %>%
+  dplyr::select(aar, kvartal, value)
+
+# Kombiner datasæt til én samlet tibble
+viborg_befolkning_komplet <- bind_rows(
+  stat_viborg_for_2005,
+  stat_viborg_2005_2007,
+  stat_viborg_efter_2008
+) %>%
+  arrange(aar, kvartal) %>%
+  rename(Indbyggere_Viborg_Kommune = value)
+
+
 # ---- DATARENSNING ----
 vff_kampdata_clean <- kombineret_runde_table %>%
   # Split dato_tid i separate kolonner
@@ -152,6 +204,46 @@ saveRDS(vff_kampdata_clean, "vff_kampdata_clean.rds")
 # Load RDS
 vff_kampdata_clean <- readRDS("vff_kampdata_clean.rds")
 
+### Tilføj befolkningsdata til kampdata
+vff_kampdata_med_befolkning <- vff_kampdata_clean %>%
+  mutate(
+    # Beregn kvartal fra kamp_dato
+    år_char = as.character(år),
+    kvartal = paste0("K", quarter(kamp_dato))
+  ) %>%
+  # Fjern rækker uden gyldig dato
+  filter(!is.na(kamp_dato)) %>%
+  # Join med kvartalsvise data først
+  left_join(viborg_befolkning_komplet, by = c("år_char" = "aar", "kvartal")) %>%
+  # For år uden kvartalsdata (2003-2007), hent det årlige tal
+  left_join(
+    viborg_befolkning_komplet %>%
+      filter(is.na(kvartal)) %>%
+      dplyr::select(aar, Indbyggere_Viborg_Kommune) %>%
+      rename(Indbyggere_aarlig = Indbyggere_Viborg_Kommune),
+    by = c("år_char" = "aar")
+  ) %>%
+  # Brug kvartalsdata hvis det er der, ellers årlige data
+  mutate(
+    Indbyggere_Viborg_Kommune = coalesce(Indbyggere_Viborg_Kommune, Indbyggere_aarlig)
+  ) %>%
+  # Fjern hjælpekolonner
+  dplyr::select(-år_char, -Indbyggere_aarlig) %>%
+  # Sorter kronologisk
+  arrange(kamp_dato) %>%
+  # Tilføj akkumuleret befolkningsvækst
+  mutate(
+    # Find befolkningstal for første kamp i 2003
+    basis_befolkning = first(Indbyggere_Viborg_Kommune),
+    # Beregn akkumuleret vækst fra 2003
+    akk_indbyggertal = Indbyggere_Viborg_Kommune - basis_befolkning
+  ) %>%
+  # Fjern basis_befolkning hjælpekolonne
+  dplyr::select(-basis_befolkning) %>%
+  # Omorganiser kolonner så befolkningsdata kommer sidst
+  dplyr::select(sæson, år, ugedag, dato, tid, kamp, stilling, tilskuere, dommer, 
+                tv_kanal, kamp_dato, helligdag, kvartal, Indbyggere_Viborg_Kommune, 
+                akk_indbyggertal)
 
-
+View(vff_kampdata_med_befolkning)
 
