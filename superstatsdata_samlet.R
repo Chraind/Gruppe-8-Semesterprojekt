@@ -105,7 +105,6 @@ kampdata_vff <- alt_superstats_data %>%
 
   # VFF involveret i udekampe eller hjemmekampe
   mutate(
-    # Tjek om VFF/Viborg er hjemmehold (står før bindestreg)
     vff_spiller = grepl("(VFF|Viborg)", kamp, ignore.case = TRUE)
   ) %>%
   
