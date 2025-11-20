@@ -1,5 +1,6 @@
 pacman::p_load(tidyverse, vroom, janitor, polite, rjstat, rvest, lubridate, stringi, httr, jsonlite, purrr, utils)
 
+# ---- HENT DATA FRA SUPERSTATS ---- #
 ### Find de år hvor VFF er i superligaen
 superliga_url <- "https://superstats.dk/hold/alltime?id=11"
 read_superliga <- read_html(superliga_url, encoding = "UTF-8")
@@ -58,9 +59,7 @@ for (i in seq_along(sæson_urls)) {
     if ("tilskuere" %in% names(df)) {
       df <- df %>%
         mutate(
-          tilskuere = gsub("\\.","",tilskuere),
-          tilskuere = gsub(",",".",tilskuere),
-          tilskuere = as.numeric(tilskuere)
+          tilskuere = as.numeric(gsub("[^0-9]", "", tilskuere))
         )
     }
     
@@ -79,16 +78,18 @@ for (i in seq_along(sæson_urls)) {
   cat(" Fejl ved hentning af data for", year, ":", e$message, "\n")  
 })
 
+
+######
+#####
+###
 # TODO: upload scraped data til SQL databasen
+###
+####
+#####
 
-# Gem RDS så man ikke ddos'er superstats, da man kun behøver køre ovenstående kode når man vil have opdateret tabel
-saveRDS(kombineret_runde_table, "alt_superstats_data.rds")
 
-# Load RDS
-alt_superstats_data <- readRDS("alt_superstats_data.rds")
-view(alt_superstats_data)
 
-# ---- date.nager.at data hentning ----
+# ---- HENT DATA FRA DATE.NAGER.AT ---- #
 alle_helligdage <- tibble()
 for (year in sæson_år) {
   url <- paste0("https://date.nager.at/api/v3/PublicHolidays/", year, "/DK")
@@ -98,7 +99,7 @@ for (year in sæson_år) {
   Sys.sleep(1)
 }
 
-# ---- HENT BEFOLKNINGSDATA FRA DANMARKS STATISTIK ----
+# ---- HENT BEFOLKNINGSDATA FRA DANMARKS STATISTIK ---- #
 # Definer URLs
 urls <- list(
   for_2005 = "https://api.statbank.dk/v1/data/bef1a/JSONSTAT?OMRÅDE=791%2C761%2C763%2C769%2C775%2C789&Tid=2002%2C2003%2C2004",
@@ -150,60 +151,48 @@ viborg_befolkning_komplet <- bind_rows(
   rename(Indbyggere_Viborg_Kommune = value)
 
 
-# ---- DATARENSNING ----
-kampdata_vff <- alt_superstats_data %>%
-  # Split dato_tid i separate kolonner
+# ---- DATARENSNING ---- #
+vff_kampdata <- kombineret_runde_table %>%
+  
+  # --- Split dato/tid i separate kolonner ---
   separate(dato, into = c("dato", "tid"), sep = " ", remove = FALSE) %>%
-
-  # VFF involveret i udekampe eller hjemmekampe
+  
+  # --- Identificer VFF-kampe ---
   mutate(
     vff_spiller = grepl("(VFF|Viborg)", kamp, ignore.case = TRUE)
   ) %>%
+  filter(vff_spiller, !is.na(tilskuere)) %>%
   
-  # Filtrer de kampe hvor VFF spiller og hvor tilskuere eksisterer
-  filter(vff_spiller == TRUE) %>%
-  filter(!is.na(tilskuere)) %>% 
-  
-  # Konverter tilskuere til numerisk (fjern punktum-tusindtalsseparator hvis nødvendig)
+  # --- Sæson & år ---
   mutate(
-    tilskuere = as.numeric(gsub("[^0-9]", "", tilskuere))
-  ) %>% 
-  
-  # Vis sæson korrekt
-  mutate(sæson = paste0(sæson - 1, "/", sæson)) %>% 
-  
-  # Tilføj år til dato-strengen
-  mutate(
-    month = as.numeric(str_sub(dato, 4, 5)),  # Gemmer position 4 og 5 i dato kolonnen, ekstraherer måned fra "18/07"
-    end_year = as.numeric(str_sub(sæson, 6, 9)),  # Gemmer position 6 til 9 i sæson kolonnen, som er 2026 i "2025/2026"
+    sæson = paste0(sæson - 1, "/", sæson), # vis sæson korrekt
+    month = as.numeric(str_sub(dato, 4, 5)), 
+    end_year = as.numeric(str_sub(sæson, 6, 9)),
+    # Tildel korrekt kalenderår (sæson starter i juli, slutter i maj)
     år = ifelse(month >= 7 & month <= 12, end_year - 1, end_year)
   ) %>%
   
-  # Tilføj kamp_dato
-  mutate (
-    kamp_dato = dmy(paste0(dato, "/", år))
-  ) %>% 
+  # --- Dato ---
+  mutate(kamp_dato = dmy(paste0(dato, "/", år))) %>%
   
+  # --- Helligdage ---
   # Indsættelse af helligdag data fra date.nager.at og ser om datoen matcher kamp_dato
-  mutate(
-    helligdag = kamp_dato %in% as.Date(alle_helligdage$date)
-  ) %>% 
+  mutate(helligdag = kamp_dato %in% as.Date(alle_helligdage$date)) %>%
   
+  # --- Tid & tidsgrupper ---
   # Tilføj tids kolonne, tidligt midt sent
   mutate(
-    # Formater tid så de står i timer, minutter og sekunder (HH:MM:SS)
-    tid = ifelse(grepl("^\\d{2}:\\d{2}$", tid), paste0(tid, ":00"), tid),
-    tid = na_if(tid, ""),  # hvis NA eksisterer brug "" i stedet
-    
-    klokkeslæt = hms::as_hms(tid),
-    
+    # Formater tid så de står i timer og minutter (HH:MM)
+    tid = na_if(tid, ""), # hvis NA eksisterer brug "" i stedet
+    klokkeslæt = hms::parse_hm(tid),
     tidsgruppe = case_when(
-      klokkeslæt >= hms("12:00:00") & klokkeslæt < hms("15:30:00") ~ "tidligt",
-      klokkeslæt >= hms("15:30:00") & klokkeslæt < hms("18:30:00") ~ "midt",
-      klokkeslæt >= hms("18:30:00") & klokkeslæt <= hms("23:59:59") ~ "sent",
-      TRUE ~ NA_character_
+      klokkeslæt >= hms::parse_hm("12:00") & klokkeslæt < hms::parse_hm("15:30") ~ "tidligt",
+      klokkeslæt >= hms::parse_hm("15:30") & klokkeslæt < hms::parse_hm("18:30") ~ "midt",
+      klokkeslæt >= hms::parse_hm("18:30") & klokkeslæt <= hms::parse_hm("23:59") ~ "sent"
     )
-  ) %>% 
+  ) %>%
+  
+  # --- Score & resultat ---
   # Tilføj kolonne hvor VFF har vundet sidste kamp
   separate(stilling, into = c("score_home", "score_away"), sep = "-", convert = TRUE, remove = FALSE) %>% 
   
@@ -218,88 +207,70 @@ kampdata_vff <- alt_superstats_data %>%
     )
   ) %>%
   
-  # Sorter efter dato
-  arrange(kamp_dato) %>%
-  
-  # Lag tidligere kampresultat
+  # Identificer om VFF spillede hjemme (kampnavn starter med VFF/Viborg)
   mutate(
-    vff_vundet_sidste_kamp = lag(vff_vundet),
-    # New column: won last two matches
-    # Tilføj ny kolonne med om de har vundet de sidste to kampe
-    vff_vundet_sidste_to_kampe = case_when(
-      lag(vff_vundet, 1) == "vundet" & lag(vff_vundet, 2) == "vundet" ~ "ja",
-      TRUE ~ "nej"
-    )
+    vff_hjemme = grepl("^(VFF|Viborg)", kamp, ignore.case = TRUE)
   ) %>%
   
-  # Fjern unødvendige kolonner
-  dplyr::select(-delete, -month, -end_year, -score_home, -score_away, -vff_score, -modstander_score)
-
-# ---- Kun VFF Hjemmekampe ----
-kampdata_vff_hjemmekampe <- kampdata_vff %>%
-# Identificer VFF hjemmekampe
-# Hjemmeholdet står først i "kamp" kolonnen (f.eks. "VFF-FCK" eller "Viborg FF - FCK")
-mutate(
-  # Tjek om VFF/Viborg er hjemmehold (står før bindestreg)
-  vff_hjemme = grepl("^(VFF|Viborg)", kamp, ignore.case = TRUE)
-) %>%
+  #Behold hjemmekampe
+  filter(vff_hjemme == TRUE) %>%
   
-  # Filtrer kun VFF hjemmekampe og kampe hvor tilskuere er NA
-  filter(vff_hjemme == TRUE) %>% 
+  # --- Sortér kronologisk ---
+  arrange(kamp_dato) %>%
   
-  # Omorganiser kolonner
-  dplyr::select(sæson, runde, år, ugedag, dato, tid, kamp, stilling, tilskuere, dommer, 
-                tv_kanal, kamp_dato, helligdag, tidsgruppe, vff_vundet_sidste_kamp, vff_vundet_sidste_to_kampe)
-
-# Gem RDS
-saveRDS(kampdata_vff_hjemmekampe, "kampdata_vff_hjemmekampe.rds")
-
-# Load RDS
-kampdata_vff_hjemmekampe <- readRDS("kampdata_vff_hjemmekampe.rds")
-
-view(kampdata_vff_hjemmekampe)
-
-### Tilføj befolkningsdata til kampdata
-vff_kampdata_med_befolkning <- kampdata_vff_hjemmekampe %>%
+  # --- Historiske resultater ---
   mutate(
-    # Beregn kvartal fra kamp_dato
+    seneste_kamp = lag(vff_vundet), # Resultat af forrige hjemmekamp
+    vff_vundet_2 = lag(vff_vundet, 1) == "vundet" & 
+      lag(vff_vundet, 2) == "vundet" # 2 sejre i træk før denne kamp
+  ) %>%
+  
+  # --- Befolkningsdata ---
+  # join med befolkningsdata
+  mutate(
     år_char = as.character(år),
     kvartal = paste0("K", quarter(kamp_dato))
   ) %>%
-  # Fjern rækker uden gyldig dato
   filter(!is.na(kamp_dato)) %>%
-  # Join med kvartalsvise data først
+  
+  # Join kvartalsbaseret befolkningsdata
   left_join(viborg_befolkning_komplet, by = c("år_char" = "aar", "kvartal")) %>%
-  # For år uden kvartalsdata (2003-2007), hent det årlige tal
+  # Join årlig befolkningsdata som backup
   left_join(
     viborg_befolkning_komplet %>%
       filter(is.na(kvartal)) %>%
-      dplyr::select(aar, Indbyggere_Viborg_Kommune) %>%
+      select(aar, Indbyggere_Viborg_Kommune) %>%
       rename(Indbyggere_aarlig = Indbyggere_Viborg_Kommune),
     by = c("år_char" = "aar")
   ) %>%
-  # Brug kvartalsdata hvis det er der, ellers årlige data
+  # Fyld manglende kvartalsdata med årsdata 
   mutate(
     Indbyggere_Viborg_Kommune = coalesce(Indbyggere_Viborg_Kommune, Indbyggere_aarlig)
   ) %>%
-  # Fjern hjælpekolonner
-  dplyr::select(-år_char, -Indbyggere_aarlig) %>%
-  # Sorter kronologisk
+  
+  # Akkumuleret befolkning
+  # Beregn vækst i indbyggertal 
   arrange(kamp_dato) %>%
-  # Tilføj akkumuleret befolkningsvækst
   mutate(
-    # Find befolkningstal for første kamp i 2003
-    basis_befolkning = first(Indbyggere_Viborg_Kommune),
-    # Beregn akkumuleret vækst fra 2003
-    akk_indbyggertal = Indbyggere_Viborg_Kommune - basis_befolkning
+    basis_befolkning = first(Indbyggere_Viborg_Kommune), #baseline
+    akk_indbyggertal = Indbyggere_Viborg_Kommune - basis_befolkning #vækst
   ) %>%
-  # Fjern basis_befolkning hjælpekolonne
-  dplyr::select(-basis_befolkning) %>%
-  # Omorganiser kolonner så befolkningsdata kommer sidst
-  dplyr::select(sæson, år, ugedag, dato, tid, kamp, stilling, tilskuere, dommer, 
-                tv_kanal, kamp_dato, helligdag, kvartal, Indbyggere_Viborg_Kommune, 
-                akk_indbyggertal, tidsgruppe, vff_vundet_sidste_kamp, vff_vundet_sidste_to_kampe)
+  
+  # --- Variabelvalg ---
+  # Behold relevante kolonner til analyse 
+  dplyr::select(
+    sæson, kamp_dato, ugedag, tid, runde, kamp, stilling, tilskuere, dommer,
+    tv_kanal, helligdag, kvartal, Indbyggere_Viborg_Kommune,
+    akk_indbyggertal, tidsgruppe, seneste_kamp, vff_vundet_2
+  )
 
-# Se resultatet
-View(vff_kampdata_med_befolkning)
 
+# ---- DATALAGRING ---- #
+# Gem RDS
+saveRDS(vff_kampdata, "data/vff_kampdata.rds")
+
+# Load RDS
+vff_kampdata <- readRDS("data/vff_kampdata.rds")
+
+# ---- SE RESULTAT ---- #
+view(vff_kampdata)
