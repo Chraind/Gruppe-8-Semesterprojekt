@@ -274,3 +274,53 @@ vff_kampdata <- readRDS("data/vff_kampdata.rds")
 
 # ---- SE RESULTAT ---- #
 view(vff_kampdata)
+# 1. Læs kampdatoer
+datoer <- as.Date(vff_kampdata$kamp_dato, format = "%d-%m-%Y")
+
+# 2. API-parametre
+base_url <- "https://dmigw.govcloud.dk/v2/metObs/collections/observation/items?"
+stationId <- "stationId=06065"  # Aars Syd
+apikey <- "api-key=08390a45-0336-470a-bb2e-8b36e59989c2"
+
+# 3. Samlet dataframe
+all_data <- data.frame()
+
+# 4. Hent data for hver kampdato (7 dage før)
+for (date in datoer) {
+  kamp_dato <- as.Date(date)
+  start_date <- kamp_dato - 7
+  end_date <- kamp_dato
+  
+  datetime <- paste0("&datetime=", start_date, "T00:00:00Z/", end_date, "T23:59:59Z")
+  url <- paste0(base_url, stationId, "&", datetime, "&", apikey)
+  
+  message("Henter data fra: ", url)
+  
+  res <- GET(URLencode(url))
+  json_txt <- rawToChar(res$content)
+  
+  if (nchar(json_txt) > 0) {
+    data <- fromJSON(json_txt)
+    if (!is.null(data$features) && length(data$features) > 0) {
+      df <- map_df(data$features, ~as.data.frame(.x$properties))
+      df$kamp_dato <- kamp_dato
+      all_data <- bind_rows(all_data, df)
+    }
+  }
+}
+
+# 5. Klargør data til wide format
+wide_data <- all_data %>%
+  select(kamp_dato, observed, parameterId, value) %>%
+  mutate(observed = as.Date(observed)) %>%
+  filter(parameterId %in% c("precip_past1h", "temp_mean_past1h", "wind_gust_always_past1h")) %>%
+  group_by(kamp_dato, observed, parameterId) %>%
+  summarise(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = parameterId, values_from = value) %>%
+  rename(regn = precip_past1h, temperatur = temp_mean_past1h, vind = wind_gust_always_past1h) %>%
+  arrange(kamp_dato, observed)
+
+#Vi mangler at lave gennemsnitsdata for 3, 7 og 10 dage.
+#Philip, jeg fik det til at virke, men så opstod der et problem med API-nøglen og dokumentet.
+#Jeg tænker, at vi skal have en funktion, der tager udgangspunkt i en given dato, lægger et antal obsivisationer til kampdatoen og 
+#finder det samlede gennemsnit for perioden.
