@@ -1,5 +1,5 @@
 pacman::p_load(tidyverse, vroom, janitor, polite, rjstat, rvest, lubridate,
-               stringi, httr, jsonlite, purrr, utils, DBI, odbc)
+               stringi, httr, jsonlite, purrr, utils, RSQLite, DBI)
 
 # ---- HENT DATA FRA SUPERSTATS ---- #
 ### Find de år hvor VFF er i superligaen
@@ -108,7 +108,7 @@ view(alle_helligdage)
 # Definer URLs
 urls <- list(
   for_2005 = "https://api.statbank.dk/v1/data/bef1a/JSONSTAT?OMRÅDE=791%2C761%2C763%2C769%2C775%2C789&Tid=2002%2C2003%2C2004",
-  aar_2005_2007 = "https://api.statbank.dk/v1/data/bef1a07/JSONSTAT?OMRÅDE=791&Tid=2005%2C2006%2C2007",
+  år_2005_2007 = "https://api.statbank.dk/v1/data/bef1a07/JSONSTAT?OMRÅDE=791&Tid=2005%2C2006%2C2007",
   efter_2008 = "https://api.statbank.dk/v1/data/folk1a/JSONSTAT?OMRÅDE=791&KØN=TOT&ALDER=IALT&CIVILSTAND=TOT&Tid=2008K1%2C2008K2%2C2008K3%2C2008K4%2C2013K1%2C2013K2%2C2013K3%2C2013K4%2C2014K1%2C2014K2%2C2014K3%2C2014K4%2C2015K1%2C2015K2%2C2015K3%2C2015K4%2C2016K1%2C2016K2%2C2016K3%2C2016K4%2C2017K1%2C2017K2%2C2017K3%2C2017K4%2C2021K1%2C2021K2%2C2021K3%2C2021K4%2C2022K1%2C2022K2%2C2022K3%2C2022K4%2C2023K1%2C2023K2%2C2023K3%2C2023K4%2C2024K1%2C2024K2%2C2024K3%2C2024K4%2C2025K1%2C2025K2%2C2025K3%2C2025K4"
 )
 
@@ -119,21 +119,21 @@ stat_viborg_for_2005 <- fromJSONstat(urls$for_2005) %>%
   group_by(tid) %>%
   summarise(value = sum(value, na.rm = TRUE)) %>%
   mutate(
-    aar = as.character(tid),
+    år = as.character(tid),
     kvartal = as.character(NA)
   ) %>%
-  dplyr::select(aar, kvartal, value)
+  dplyr::select(år, kvartal, value)
 
 # Hent og bearbejd data for 2005-2007
-stat_viborg_2005_2007 <- fromJSONstat(urls$aar_2005_2007) %>%
+stat_viborg_2005_2007 <- fromJSONstat(urls$år_2005_2007) %>%
   as_tibble() %>%
   pull(1) %>%
   dplyr::select(tid, value) %>%
   mutate(
-    aar = as.character(tid),
+    år = as.character(tid),
     kvartal = as.character(NA)
   ) %>%
-  dplyr::select(aar, kvartal, value)
+  dplyr::select(år, kvartal, value)
 
 # Hent og bearbejd data efter 2008 (nu med kvartals optælling)
 stat_viborg_efter_2008 <- fromJSONstat(urls$efter_2008) %>%
@@ -141,10 +141,10 @@ stat_viborg_efter_2008 <- fromJSONstat(urls$efter_2008) %>%
   pull(1) %>%
   dplyr::select(tid, value) %>%
   mutate(
-    aar = str_extract(tid, "^\\d{4}"),
+    år = str_extract(tid, "^\\d{4}"),
     kvartal = str_extract(tid, "K\\d")
   ) %>%
-  dplyr::select(aar, kvartal, value)
+  dplyr::select(år, kvartal, value)
 
 # Kombiner datasæt til én samlet tibble
 viborg_befolkning_komplet <- bind_rows(
@@ -152,7 +152,7 @@ viborg_befolkning_komplet <- bind_rows(
   stat_viborg_2005_2007,
   stat_viborg_efter_2008
 ) %>%
-  arrange(aar, kvartal) %>%
+  arrange(år, kvartal) %>%
   rename(Indbyggere_Viborg_Kommune = value)
 
 # ---- DATARENSNING ---- #
@@ -246,18 +246,18 @@ vff_kampdata <- vff_kampdata_upload %>%
   filter(!is.na(kamp_dato)) %>%
   
   # Join kvartalsbaseret befolkningsdata
-  left_join(viborg_befolkning_komplet, by = c("år_char" = "aar", "kvartal")) %>%
+  left_join(viborg_befolkning_komplet, by = c("år_char" = "år", "kvartal")) %>%
   # Join årlig befolkningsdata som backup
   left_join(
     viborg_befolkning_komplet %>%
       filter(is.na(kvartal)) %>%
-      select(aar, Indbyggere_Viborg_Kommune) %>%
-      rename(Indbyggere_aarlig = Indbyggere_Viborg_Kommune),
-    by = c("år_char" = "aar")
+      select(år, Indbyggere_Viborg_Kommune) %>%
+      rename(Indbyggere_årlig = Indbyggere_Viborg_Kommune),
+    by = c("år_char" = "år")
   ) %>%
   # Fyld manglende kvartalsdata med årsdata 
   mutate(
-    Indbyggere_Viborg_Kommune = coalesce(Indbyggere_Viborg_Kommune, Indbyggere_aarlig)
+    Indbyggere_Viborg_Kommune = coalesce(Indbyggere_Viborg_Kommune, Indbyggere_årlig)
   ) %>%
   
   # Akkumuleret befolkning
@@ -293,7 +293,7 @@ datoer <- as.Date(vff_kampdata$kamp_dato, format = "%d-%m-%Y")
 
 # 2. API-parametre
 base_url <- "https://dmigw.govcloud.dk/v2/metObs/collections/observation/items?"
-stationId <- "stationId=06065"  # Aars Syd
+stationId <- "stationId=06065"  # års Syd
 apikey <- "api-key=219f3da7-1f91-4cb4-83e8-d19e2f03fb48"
 
 readRenviron("~/.Renviron")
@@ -367,6 +367,13 @@ viborg_befolkning_komplet <- readRDS("data/viborg_befolkning_komplet.rds")
 wide_data <- readRDS("data/wide_data.rds")
 vffkort01 <- readRDS("data/vffkort01.rds")
 
+# inspekt data
+glimpse(wide_data)
+glimpse(viborg_befolkning_komplet)
+glimpse(alle_helligdage)
+glimpse(vff_kampdata_upload)
+glimpse(vffkort01)
+
 # giv vffkort01 kamp_dato variable
 vffkort01 <- vffkort01 %>%
   left_join(
@@ -375,8 +382,20 @@ vffkort01 <- vffkort01 %>%
     by = c("år", "tilskuere")
   )
 
-view(vffkort01)
-view(vff_kampdata_upload)
+# ændre format
+viborg_befolkning_komplet$år <- as.double(viborg_befolkning_komplet$år)
+alle_helligdage$date <- as.Date(alle_helligdage$date)
+
+# giv viborg_befolkning_komplet kamp_dato variable
+viborg_befolkning_komplet <- viborg_befolkning_komplet %>% 
+  select(år, Indbyggere_Viborg_Kommune) %>% 
+  group_by(år) %>% 
+  slice_max(Indbyggere_Viborg_Kommune, n = 1, with_ties = FALSE) %>% 
+  ungroup() %>% 
+  left_join(
+    vff_kampdata_upload %>% select(år, kamp_dato),
+    by = "år"
+  )
 
 # Vi mangler at lave gennemsnitsdata for 3, 7 og 10 dage.
 # Philip, jeg fik det til at virke, men så opstod der et problem med API-nøglen og dokumentet.
@@ -384,11 +403,15 @@ view(vff_kampdata_upload)
 # finder det samlede gennemsnit for perioden.
 
 
-readRenviron("~/.Renviron")
+# readRenviron("~/.Renviron")
 
-con <- dbConnect(odbc(), Driver = "ODBC Driver 18 for SQL Server",
-                 Server = "lassesqlserver.database.windows.net", Database = "lasseDatabase",
-                 Port = "1433", UID = Sys.getenv("sqlusername"), PWD = Sys.getenv("sqlpassword"))
+# con <- dbConnect(odbc(), Driver = "ODBC Driver 18 for SQL Server",
+#                  Server = "lassesqlserver.database.windows.net", Database = "lasseDatabase",
+#                  Port = "1433", UID = Sys.getenv("sqlusername"), PWD = Sys.getenv("sqlpassword"))
+
+#Opsætning og tilslutning til lokal sql db
+
+con <- dbConnect(RSQLite::SQLite(), "data/VFF_data.sqlite")
 
 uploadtables <- list(
   vff_kampdata_upload = vff_kampdata_upload,
@@ -397,13 +420,6 @@ uploadtables <- list(
   wide_data = wide_data,
   vffkort01 = vffkort01
 )
-
-glimpse(wide_data)
-glimpse(viborg_befolkning_komplet)
-glimpse(alle_helligdage)
-glimpse(vff_kampdata_upload)
-glimpse(vffkort01)
-view(vffkort01)
 
 for(name in names(uploadtables)) {
   cat("Uploading table:", name, "\n")
@@ -429,35 +445,32 @@ query <- "SELECT
               k.d10_tilskuere,
               k.d7_tilskuere,
               k.d3_tilskuere
-          FROM vff_kampdata_upload v
+          FROM vff_kampdata_upload AS v
           
           -- Join with wide_data on kamp_dato
-          LEFT JOIN wide_data w
+          LEFT JOIN wide_data AS w
               ON v.kamp_dato = w.kamp_dato
           
           -- Join with alle_helligdage on date (converted to DATE)
-          LEFT JOIN alle_helligdage h
-              ON v.kamp_dato = CAST(h.date AS DATE)
+          LEFT JOIN alle_helligdage AS h
+              ON v.kamp_dato = h.date
           
           -- Join with viborg_befolkning_komplet on year only (one row per year)
-          LEFT JOIN (
-              SELECT aar, MAX(Indbyggere_Viborg_Kommune) AS Indbyggere_Viborg_Kommune
-              FROM viborg_befolkning_komplet
-              GROUP BY aar
-          ) b
-              ON CAST(YEAR(v.kamp_dato) AS VARCHAR(4)) = b.aar
+          LEFT JOIN viborg_befolkning_komplet AS b
+              ON v.kamp_dato = b.kamp_dato
           
           -- Join with vffkort01 on kamp_dato
-          LEFT JOIN vffkort01 k
+          LEFT JOIN vffkort01 AS k
               ON v.kamp_dato = k.kamp_dato;
           "
 
 # Run the query and get the result as a data frame in R
-joined_data <- dbGetQuery(con, query)
+joined_data <- dbGetQuery(con, query) %>%
+  mutate(kamp_dato = as.Date(kamp_dato)) %>% 
+  mutate(observed = as.Date(observed))
 
-# saveRDS(joined_data, "data/joined_data.rds")
+saveRDS(joined_data, "data/joined_data.rds")
 joined_data <- readRDS("data/joined_data.rds")
-
 
 view(joined_data)
 
