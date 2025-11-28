@@ -433,7 +433,6 @@ dbListTables(con, schema = "dbo")
 # Your SQL query as a string
 query <- "SELECT 
               v.*,
-              w.observed,
               w.regn,
               w.temperatur,
               w.vind,
@@ -466,8 +465,7 @@ query <- "SELECT
 
 # Run the query and get the result as a data frame in R
 joined_data <- dbGetQuery(con, query) %>%
-  mutate(kamp_dato = as.Date(kamp_dato)) %>% 
-  mutate(observed = as.Date(observed))
+  mutate(kamp_dato = as.Date(kamp_dato))
 
 saveRDS(joined_data, "data/joined_data.rds")
 joined_data <- readRDS("data/joined_data.rds")
