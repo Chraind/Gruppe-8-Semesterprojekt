@@ -1,4 +1,7 @@
-pacman::p_load(tidyverse, janitor, rvest, lubridate, stringi, httr, jsonlite, purrr)
+pacman::p_load(tidyverse, janitor, rvest, lubridate, stringi, httr, jsonlite, purrr, 
+               knitr, tinytex)
+# ctrl alt i = kode chunk i quarto
+
 
 fcidk <- readRDS("fcidk.rds")
 vffkort01 <- readRDS("vffkort01.rds")
