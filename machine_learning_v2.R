@@ -19,15 +19,15 @@ vff_variabler <- data_clean %>%
          temperatur, vind, helligdag, akk_indbyggertal)
 
 vff_10 <- data_clean %>%
-  select(d10_tilskuere, runde, år, ugedag, tidsgruppe,
+  select(d10_tilskuere, d10, runde, år, ugedag, tidsgruppe,
          seneste_kamp, vff_vundet_2, helligdag, akk_indbyggertal)
 
 vff_7 <- data_clean %>%
-  select(d7_tilskuere, runde, år, ugedag, tidsgruppe,
+  select(d7_tilskuere, d7, runde, år, ugedag, tidsgruppe,
          seneste_kamp, vff_vundet_2, helligdag, akk_indbyggertal)
 
 vff_3 <- data_clean %>%
-  select(d3_tilskuere, runde, år, ugedag, tidsgruppe,
+  select(d3_tilskuere, d3, runde, år, ugedag, tidsgruppe,
          seneste_kamp, vff_vundet_2, helligdag, akk_indbyggertal)
 
 
@@ -53,7 +53,7 @@ run_all_models <- function(data, response) {
   
   formula <- as.formula(paste(response, "~ ."))
   
-  set.seed(1)
+  set.seed(8)
   train_idx <- sample(1:nrow(data), nrow(data) / 2)
   train <- data[train_idx, ]
   test  <- data[-train_idx, ]

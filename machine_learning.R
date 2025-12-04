@@ -9,7 +9,7 @@ pacman::p_load("tidyverse", "magrittr", "nycflights13", "gapminder",
                "splines", "ISLR2", "MASS", "testthat", "leaps", "caret",
                "RSQLite", "class", "viridis", "boot", "glmnet", "pls")
 
-joined_data <- readRDS("data/joined_data.rds")
+joined_data <- readRDS("data/joined_data_clean.rds")
 
 # Remove rows with NAs (simplest approach)
 data_clean <- na.omit(joined_data)
