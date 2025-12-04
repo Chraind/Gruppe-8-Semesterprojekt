@@ -1,14 +1,9 @@
-# ============================================================
-# LOAD LIBRARIES
-# ============================================================
-pacman::p_load(
-  tidyverse, leaps, glmnet, pls
-)
+pacman::p_load(tidyverse, leaps, glmnet, pls)
 
 # ============================================================
 # LOAD DATA
 # ============================================================
-data_clean <- na.omit(readRDS("data/joined_data.rds"))
+data_clean <- readRDS("data/joined_data_clean.rds")
 
 # ============================================================
 # YOUR FOUR DATASETS
@@ -16,19 +11,19 @@ data_clean <- na.omit(readRDS("data/joined_data.rds"))
 vff_variabler <- data_clean %>%
   select(tilskuere, runde, år, ugedag, tidsgruppe,
          seneste_kamp, vff_vundet_2, regn_gruppe,
-         temperatur, vind, helligdag, akk_indbyggertal)
+         temperatur, vind, akk_indbyggertal, kamp_gruppe, ferie_flag) %>%  na.omit()
 
 vff_10 <- data_clean %>%
   select(d10_tilskuere, d10, runde, år, ugedag, tidsgruppe,
-         seneste_kamp, vff_vundet_2, helligdag, akk_indbyggertal)
+         seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>%  na.omit()
 
 vff_7 <- data_clean %>%
   select(d7_tilskuere, d7, runde, år, ugedag, tidsgruppe,
-         seneste_kamp, vff_vundet_2, helligdag, akk_indbyggertal)
+         seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>%  na.omit()
 
 vff_3 <- data_clean %>%
   select(d3_tilskuere, d3, runde, år, ugedag, tidsgruppe,
-         seneste_kamp, vff_vundet_2, helligdag, akk_indbyggertal)
+         seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>%  na.omit() %>%  view()
 
 
 # ============================================================

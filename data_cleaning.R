@@ -68,5 +68,3 @@ joined_data <- joined_data %>%
 
 # Gem renset data
 saveRDS(joined_data, "data/joined_data_clean.rds")
-
-glimpse(joined_data)
