@@ -4,7 +4,7 @@ pacman::p_load(tidyverse, leaps, glmnet, pls)
 # LOAD DATA
 # ============================================================
 data_clean <- readRDS("data/joined_data_clean.rds")
-
+view(data_clean)
 # ============================================================
 # YOUR FOUR DATASETS
 # ============================================================
@@ -18,11 +18,11 @@ vff_10 <- data_clean %>%
          seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>%  na.omit()
 
 vff_7 <- data_clean %>%
-  select(d7_tilskuere, d7, runde, år, ugedag, tidsgruppe,
+  select(d7_tilskuere, d7, d10_tilskuere, d10, runde, år, ugedag, tidsgruppe,
          seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>%  na.omit()
 
 vff_3 <- data_clean %>%
-  select(d3_tilskuere, d3, runde, år, ugedag, tidsgruppe,
+  select(d3_tilskuere, d3, d7_tilskuere, d7, d10_tilskuere, d10, runde, år, ugedag, tidsgruppe,
          seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>%  na.omit() %>%  view()
 
 
@@ -30,14 +30,10 @@ vff_3 <- data_clean %>%
 # SAFE REGSUBSETS PREDICT FUNCTION
 # ============================================================
 predict.regsubset.safe <- function(object, newdata, id, formula) {
-  
   mat <- model.matrix(formula, newdata)
-  
   coefi <- coef(object, id = id)
   vars <- names(coefi)
-  
   mat <- mat[, vars, drop = FALSE]
-  
   drop(mat %*% coefi)
 }
 

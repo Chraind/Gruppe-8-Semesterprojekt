@@ -53,18 +53,23 @@ joined_data <- joined_data %>%
 # Flag helligdage og skoleferier
 joined_data <- joined_data %>%
   mutate(
+    uge = isoweek(kamp_dato),
     ferie_navn = case_when(
-      between(kamp_dato, as.Date(paste0(år,"-02-11")), as.Date(paste0(år,"-02-17"))) ~ "vinterferie",
-      between(kamp_dato, as.Date(paste0(år,"-04-15")), as.Date(paste0(år,"-04-21"))) ~ "påskeferie",
-      between(kamp_dato, as.Date(paste0(år,"-06-25")), as.Date(paste0(år,"-08-10"))) ~ "sommerferie",
-      between(kamp_dato, as.Date(paste0(år,"-10-14")), as.Date(paste0(år,"-10-20"))) ~ "efterårsferie",
-      kamp_dato >= as.Date(paste0(år,"-12-23")) & kamp_dato <= as.Date(paste0(år+1,"-01-01")) ~ "juleferie",
+      uge == 7 ~ "vinterferie",
+      uge %in% 26:32 ~ "sommerferie",
+      uge == 42 ~ "efterårsferie",
+      uge %in% 52:1 & month(kamp_dato) %in% c(12, 1) ~ "juleferie",
       helligdag == 1 ~ "helligdag",
       TRUE ~ NA_character_
     ),
-    # Lav ferie_flag om til faktor med niveauer "nej" og "ja"
-    ferie_flag = factor(ifelse(!is.na(ferie_navn), 1, 0), levels = c(0, 1), labels = c("nej", "ja"))
+    
+    ferie_flag = factor(
+      ifelse(!is.na(ferie_navn), 1, 0),
+      levels = c(0, 1),
+      labels = c("nej", "ja")
+    )
   )
+view(joined_data)
 
 # Gem renset data
 saveRDS(joined_data, "data/joined_data_clean.rds")
