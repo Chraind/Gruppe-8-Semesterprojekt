@@ -1,13 +1,4 @@
-pacman::p_load(tidyverse, vroom, janitor, polite, rjstat, rvest, lubridate,
-               stringi, httr, jsonlite, purrr, utils, RSQLite, DBI, leaps, 
-               glmnet)
-
-pacman::p_load("tidyverse", "magrittr", "nycflights13", "gapminder",
-               "Lahman", "maps", "lubridate", "pryr", "hms", "hexbin",
-               "feather", "htmlwidgets", "broom", "pander", "modelr",
-               "XML", "httr", "jsonlite", "lubridate", "microbenchmark",
-               "splines", "ISLR2", "MASS", "testthat", "leaps", "caret",
-               "RSQLite", "class", "viridis", "boot", "glmnet", "pls")
+pacman::p_load(tidyverse, leaps, glmnet, pls)
 
 joined_data <- readRDS("data/joined_data_clean.rds")
 
