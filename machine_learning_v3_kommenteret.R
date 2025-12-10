@@ -85,6 +85,11 @@ run_all_models <- function(data, response, train_frac = 2/3, seed = 8) {
   y_test  <- test[[response]] # Vi ekstraherer det tal vi ønsker at finde, i vores tilfælde tilskuere
   
   formula <- as.formula(paste(response, "~ .")) # Laver en ligning der sætter tilskuere mod alle andre predictors
+ 
+  # ----------------- Lineær Regression (alle variabler) -----------------
+  lm.fit <- lm(formula, data = train)
+  lm.pred <- predict(lm.fit, newdata = test)
+  lm_rmse <- sqrt(mean((lm.pred - y_test)^2))
   
   # ----------------- Best Subset Selection -----------------
   k <- 10
@@ -108,6 +113,7 @@ run_all_models <- function(data, response, train_frac = 2/3, seed = 8) {
   best.size <- which.min(colMeans(cv.errors)) # colMeans() giver gennemsnittet af hver kolonne MSE på tværs af alle 10 folds. 
                                               # which.min() giver kolonnen (model) med mindst gennemsnitlige MSE.
                                               # vi får altså den model der giver den bedste balance mellem bias og variance
+  best_subset_cv_mse <- min(colMeans(cv.errors))
   best.fit <- regsubsets(formula, data = train, nvmax = best.size) # regsubsets(...) laver best subset selection på alt træningsdata 
                                                                    # og bruger best.size antal kolonner
   best.pred <- predict.regsubsets(best.fit, test, id = best.size, formula = formula) # Funktion vi lavede tidligere
@@ -125,12 +131,14 @@ run_all_models <- function(data, response, train_frac = 2/3, seed = 8) {
                                                      # den laver ridge regression for mange værdier af regulariseringsstyrken λ lambda
                                                      # og tester hver model ved cross validation. 
                                                      # Så finder den værdien af λ lambda der har lavest MSE
+  ridge_cv_mse <- min(ridge.cv$cvm)
   ridge.pred <- predict(ridge.cv, newx = x_test, s = ridge.cv$lambda.min)
   ridge_rmse <- sqrt(mean((ridge.pred - y_test)^2))
   ridge_coef <- as.matrix(coef(ridge.cv, s = "lambda.min")) # coef() trækker koefficienterne ud så de vises i resultaterne
   
   # ----------------- Lasso Regression -----------------
   lasso.cv <- cv.glmnet(x_train, y_train, alpha = 1)
+  lasso_cv_mse <- min(lasso.cv$cvm)
   lasso.pred <- predict(lasso.cv, newx = x_test, s = lasso.cv$lambda.min)
   lasso_rmse <- sqrt(mean((lasso.pred - y_test)^2))
   lasso_coef <- as.matrix(coef(lasso.cv, s = "lambda.min"))
@@ -144,6 +152,7 @@ run_all_models <- function(data, response, train_frac = 2/3, seed = 8) {
   cv_msep <- MSEP(pcr.fit)$val[1,1,] # Hent CV-fejl (MSEP) for hvert komponent-antal MSEP(...) viser [statistic, response, component]
   best_pcr_ncomp <- min(which.min(cv_msep), max_comp) # which.min(cv_msep) finder antal komponenter med lavest MSEP
                                                       # min() sikrer at vi ikke går over max_comp
+  pcr_cv_mse <- min(cv_msep, na.rm = TRUE)
   pcr.pred <- predict(pcr.fit, newdata = test, ncomp = best_pcr_ncomp) # Forudsig testdata med det optimale antal komponenter
   pcr_rmse <- sqrt(mean((pcr.pred - y_test)^2)) # Beregn RMSE på testdata
   
@@ -153,15 +162,21 @@ run_all_models <- function(data, response, train_frac = 2/3, seed = 8) {
                                                                           # finder optimalt antal latent components i stedet.
   cv_msep_pls <- MSEP(pls.fit)$val[1,1,]
   best_pls_ncomp <- min(which.min(cv_msep_pls), max_comp)
+  pls_cv_mse <- min(cv_msep_pls, na.rm = TRUE)
   pls.pred <- predict(pls.fit, newdata = test, ncomp = best_pls_ncomp)
   pls_rmse <- sqrt(mean((pls.pred - y_test)^2))
   
   # ----------------- Returner resultater -----------------
   list(
     RMSE = tibble(
-      Model = c("Best subset", "Ridge", "Lasso", "PCR", "PLS"),
-      RMSE = c(best_subset_rmse, ridge_rmse, lasso_rmse, pcr_rmse, pls_rmse)
+      Model = c("Lineær (alle variabler)", "Best subset", "Ridge", "Lasso", "PCR", "PLS"),
+      RMSE = c(lm_rmse, best_subset_rmse, ridge_rmse, lasso_rmse, pcr_rmse, pls_rmse)
     ),
+    CV_RMSE = tibble(
+      Model = c("Best subset", "Ridge", "Lasso", "PCR", "PLS"),
+      CV_RMSE = sqrt(c(best_subset_cv_mse, ridge_cv_mse, lasso_cv_mse, pcr_cv_mse, pls_cv_mse))
+    ),
+    Linear = list(model = lm.fit),
     BestSubset = list(coef = best_subset_coef, size = best.size),
     Ridge = list(coef = ridge_coef, lambda_min = ridge.cv$lambda.min),
     Lasso = list(coef = lasso_coef, lambda_min = lasso.cv$lambda.min),
@@ -180,4 +195,32 @@ results_tilskuere
 results_10
 results_7
 results_3
+
+
+# Fortolkning
+# results_tilskuere:
+# Uden billetsalg klarer den lineære funktion og PLS bedst. RMSE på den lineære ligger på 1125 og PLS 1129. Lasso ligger også tæt på 1151
+# med en anden seed kan de godt bytte plads.
+# Lasso og Ridge skrumper nogle af koefficienterne, men det ligner at der ikke er nogen stærk multikollinearitet eller unødvendige variabler
+# PCR klarer sig ikke så godt - det kan tyde på overfitting
+# 
+# results_10, results_7, results_3
+# Lasso, PLS, best subset og den lineære regression klarer sig bedst
+# PCR og Ridge bliver ustabile, når vi tilføjer den stærke predictor (billetsalg)
+
+
+# Hvordan er Test-MSE sammenlignet med CV-MSE
+# 
+# results_tilskuere:
+# Vi har brugt RMSE til at vurdere modellerne. Når de omregnes til CV_RMSE ligger de tæt på test_RMSE.
+# Dette indikerer at cross validation processen giver en pålidelig vurdering af fejl uden for datasættet
+# Lasso og PLS opnår den laveste prediction error, som kan tyde på at regularisering og reduktion af predictors 
+# hjælper med at forbedre generaliseringsevnen. 
+# Best subset selection har en lidt højere test_RMSE på 1313, Det kan muligvis tyde på overfitting da vi ikke har tilstrækkeligt nok data.
+# 
+# results_10, results_7, results_3
+# Når vi inkluderer billetsalg fra op til 10 dage før kampen, falder fejlene mere og mere. 
+# Best subset selection, Lasso og PLS klarer sig bedst og man kan vurdere billetsalg er en stærk predictor
+# Ridge klarer sig ringere og ringere i test_RMSE. Dette sker fordi Ridge laver alle predictors tættere på 0, også den stærke billetsalg
+# PCR bliver ustabil i test_RMSE - det kan tyde på overfitting
 

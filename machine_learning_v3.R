@@ -2,7 +2,6 @@ pacman::p_load(tidyverse, leaps, glmnet, pls)
 
 # Indlæs data fra data_cleaning.R script
 data_clean <- readRDS("data/joined_data_clean.rds")
-view(data_clean)
 
 # Variabelvalg til machine learning modeller
 
@@ -64,7 +63,7 @@ predict.regsubsets <- function(object, newdata, id, formula) {
 }
 
 # Funktion til at køre alle machine learning modeller
-run_all_models <- function(data, response, train_frac = 2/3, seed = 1) {
+run_all_models <- function(data, response, train_frac = 2/3, seed = 8) {
   
   set.seed(seed)
   n <- nrow(data)
@@ -77,6 +76,11 @@ run_all_models <- function(data, response, train_frac = 2/3, seed = 1) {
   y_test  <- test[[response]]
   
   formula <- as.formula(paste(response, "~ ."))
+  
+  # ----------------- Lineær Regression (alle variabler) -----------------
+  lm.fit <- lm(formula, data = train)
+  lm.pred <- predict(lm.fit, newdata = test)
+  lm_rmse <- sqrt(mean((lm.pred - y_test)^2))
   
   # ----------------- Best Subset Selection -----------------
   k <- 10
@@ -92,6 +96,7 @@ run_all_models <- function(data, response, train_frac = 2/3, seed = 1) {
   }
   
   best.size <- which.min(colMeans(cv.errors))
+  best_subset_cv_mse <- min(colMeans(cv.errors))
   best.fit <- regsubsets(formula, data = train, nvmax = best.size)
   best.pred <- predict.regsubsets(best.fit, test, id = best.size, formula = formula)
   best_subset_rmse <- sqrt(mean((best.pred - y_test)^2))
@@ -102,12 +107,14 @@ run_all_models <- function(data, response, train_frac = 2/3, seed = 1) {
   x_test  <- model.matrix(formula, test)[, -1]
   
   ridge.cv <- cv.glmnet(x_train, y_train, alpha = 0)
+  ridge_cv_mse <- min(ridge.cv$cvm)
   ridge.pred <- predict(ridge.cv, newx = x_test, s = ridge.cv$lambda.min)
   ridge_rmse <- sqrt(mean((ridge.pred - y_test)^2))
   ridge_coef <- as.matrix(coef(ridge.cv, s = "lambda.min"))
   
   # ----------------- Lasso Regression -----------------
   lasso.cv <- cv.glmnet(x_train, y_train, alpha = 1)
+  lasso_cv_mse <- min(lasso.cv$cvm)
   lasso.pred <- predict(lasso.cv, newx = x_test, s = lasso.cv$lambda.min)
   lasso_rmse <- sqrt(mean((lasso.pred - y_test)^2))
   lasso_coef <- as.matrix(coef(lasso.cv, s = "lambda.min"))
@@ -117,6 +124,7 @@ run_all_models <- function(data, response, train_frac = 2/3, seed = 1) {
   max_comp <- min(nrow(train) - 1, ncol(train) - 1)
   cv_msep <- MSEP(pcr.fit)$val[1,1,]
   best_pcr_ncomp <- min(which.min(cv_msep), max_comp)
+  pcr_cv_mse <- min(cv_msep, na.rm = TRUE)
   pcr.pred <- predict(pcr.fit, newdata = test, ncomp = best_pcr_ncomp)
   pcr_rmse <- sqrt(mean((pcr.pred - y_test)^2))
   
@@ -124,15 +132,21 @@ run_all_models <- function(data, response, train_frac = 2/3, seed = 1) {
   pls.fit <- plsr(formula, data = train, scale = TRUE, validation = "CV")
   cv_msep_pls <- MSEP(pls.fit)$val[1,1,]
   best_pls_ncomp <- min(which.min(cv_msep_pls), max_comp)
+  pls_cv_mse <- min(cv_msep_pls, na.rm = TRUE)
   pls.pred <- predict(pls.fit, newdata = test, ncomp = best_pls_ncomp)
   pls_rmse <- sqrt(mean((pls.pred - y_test)^2))
   
-  # ----------------- Returner resultater -----------------
+  # ----------------- Return -----------------
   list(
     RMSE = tibble(
-      Model = c("Best subset", "Ridge", "Lasso", "PCR", "PLS"),
-      RMSE = c(best_subset_rmse, ridge_rmse, lasso_rmse, pcr_rmse, pls_rmse)
+      Model = c("Lineær (alle variabler)", "Best subset", "Ridge", "Lasso", "PCR", "PLS"),
+      RMSE = c(lm_rmse, best_subset_rmse, ridge_rmse, lasso_rmse, pcr_rmse, pls_rmse)
     ),
+    CV_RMSE = tibble(
+      Model = c("Best subset", "Ridge", "Lasso", "PCR", "PLS"),
+      CV_RMSE = sqrt(c(best_subset_cv_mse, ridge_cv_mse, lasso_cv_mse, pcr_cv_mse, pls_cv_mse))
+    ),
+    Linear = list(model = lm.fit),
     BestSubset = list(coef = best_subset_coef, size = best.size),
     Ridge = list(coef = ridge_coef, lambda_min = ridge.cv$lambda.min),
     Lasso = list(coef = lasso_coef, lambda_min = lasso.cv$lambda.min),
@@ -151,4 +165,33 @@ results_tilskuere
 results_10
 results_7
 results_3
+
+# Fortolkning
+# results_tilskuere:
+# Uden billetsalg klarer den lineære funktion og PLS bedst. RMSE på den lineære ligger på 1125 og PLS 1129. Lasso ligger også tæt på 1151
+# med en anden seed kan de godt bytte plads.
+# Lasso og Ridge skrumper nogle af koefficienterne, men det ligner at der ikke er nogen stærk multikollinearitet eller unødvendige variabler
+# PCR klarer sig ikke så godt - det kan tyde på overfitting
+# 
+# results_10, results_7, results_3
+# Lasso, PLS, best subset og den lineære regression klarer sig bedst
+# PCR og Ridge bliver ustabile, når vi tilføjer den stærke predictor (billetsalg)
+
+
+# Hvordan er Test-MSE sammenlignet med CV-MSE
+# 
+# results_tilskuere:
+# Vi har brugt RMSE til at vurdere modellerne. Når de omregnes til CV_RMSE ligger de tæt på test_RMSE.
+# Dette indikerer at cross validation processen giver en pålidelig vurdering af fejl uden for datasættet
+# Lasso og PLS opnår den laveste prediction error, som kan tyde på at regularisering og reduktion af predictors 
+# hjælper med at forbedre generaliseringsevnen. 
+# Best subset selection har en lidt højere test_RMSE på 1313, Det kan muligvis tyde på overfitting da vi ikke har tilstrækkeligt nok data.
+# 
+# results_10, results_7, results_3
+# Når vi inkluderer billetsalg fra op til 10 dage før kampen, falder fejlene mere og mere. 
+# Best subset selection, Lasso og PLS klarer sig bedst og man kan vurdere billetsalg er en stærk predictor
+# Ridge klarer sig ringere og ringere i test_RMSE. Dette sker fordi Ridge laver alle predictors tættere på 0, også den stærke billetsalg
+# PCR bliver ustabil i test_RMSE - det kan tyde på overfitting
+
+
 
