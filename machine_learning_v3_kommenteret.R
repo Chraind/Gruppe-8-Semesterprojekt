@@ -1,0 +1,183 @@
+pacman::p_load(tidyverse, leaps, glmnet, pls)
+
+# Indlæs data fra data_cleaning.R script
+data_clean <- readRDS("data/joined_data_clean.rds")
+view(data_clean)
+
+# Variabelvalg til machine learning modeller
+
+# Før 10 dage før kampen (ingen billetsalg endnu)
+vff_variabler <- data_clean %>%
+  select(tilskuere, runde, år, ugedag, tidsgruppe,
+         seneste_kamp, vff_vundet_2, regn_gruppe,
+         temperatur, vind, akk_indbyggertal, kamp_gruppe, ferie_flag) %>% na.omit()
+
+# 10 dage før kampen (salg og fraktion tilgængelig)
+vff_10 <- data_clean %>%
+  select(tilskuere, salg_10, frak_10, runde, år, ugedag, tidsgruppe,
+         seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>%  na.omit()
+
+# 7 dage før kampen (akkumuleret salg og fraktion)
+vff_7 <- data_clean %>%
+  mutate(
+    salg_7_akk = salg_10 + salg_7,
+    frak_7_akk = frak_10 + frak_7
+  ) %>%
+  select(tilskuere, salg_7_akk, frak_7_akk, runde, år, ugedag, tidsgruppe,
+         seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>% na.omit()
+
+# 3 dage før kampen (akkumuleret salg og fraktion)
+vff_3 <- data_clean %>%
+  mutate(
+    salg_3_akk = salg_10 + salg_7 + salg_3,
+    frak_3_akk = frak_10 + frak_7 + frak_3
+  ) %>%
+  select(tilskuere, salg_3_akk, frak_3_akk, runde, år, ugedag, tidsgruppe,
+         seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>% na.omit()
+
+### note: Jeg har også prøvet at dividere billetsalg med fraktion, og dette giver et "perfekt" prediktion.
+#         men jeg tror at vi bare skal have akkumuleret tal for at få det mest forståelige RMSE resultat
+# 
+# mutate(
+# salg_3_akkumuleret = salg_10 + salg_7 + salg_3,
+# frak_3_akkumuleret = frak_10 + frak_7 + frak_3,
+# tilskuere_est = salg_3_akkumuleret / frak_3_akkumuleret'
+# )
+# 
+# mutate(
+# salg_7_akkumuleret = salg_10 + salg_7,
+# frak_7_akkumuleret = frak_10 + frak_7,
+# tilskuere_est = salg_7_akkumuleret / frak_7_akkumuleret
+# )
+# 
+# mutate(
+# tilskuere_est = salg_10 / frak_10
+# )
+
+
+# Funktion til predict i best subset selection
+predict.regsubsets <- function(object, newdata, id, formula) {
+  mat <- model.matrix(formula, newdata) # Predictors bliver lavet om til tal som er klar til matrix multiplikation
+                                        # Orthogonal factor som ugedag laves om til ugedagL, ugedagQ, ugedagC osv.
+                                        # Kategoriske variabler som kamp_gruppe laves om til kamp_gruppemiddel, kamp_gruppestor 
+  coefi <- coef(object, id = id) # Fordi regsubsets ikke har en predict() funktion, 
+                                 # kan vi udregne de bedste koefficienter med id predictors
+  vars <- names(coefi) # Vi får navnene af predictors (kolonnerne) 
+  mat[, vars, drop = FALSE] %*% coefi # Her laves matrix multiplikation. Vi ganger predictors i tal-format med koefficienterne
+}
+
+# Funktion til at køre alle machine learning modeller
+run_all_models <- function(data, response, train_frac = 2/3, seed = 8) { 
+  # Vi definerer en funktion, som skal køre ML modellerne.
+  # data = vores udvalgte variabler. response = variablen vi ønsker at predict (tilskuere), 
+  # train_frac = 2/3, vi bruger 2/3 af vores rows til predictions.
+  # seed = 8, seed inkluderes i funktionen så hvis man ønsker at køre funktionen med en anden seed, 
+  # kan man tilføje det når man vil se resultaterne. For eksempel results_10 <- run_all_models(vff_10, "tilskuere", seed = 69420)
+  
+  set.seed(seed) 
+  n <- nrow(data)
+  train_idx <- sample(1:n, floor(train_frac * n)) # Her splittes tilfældige rows til training. Den ganger 2/3 med totale rows. 
+  test_idx <- setdiff(1:n, train_idx) # Her er den sidste 1/3 som bliver brugt til tests, fundet med setdiff() funktion
+  train <- data[train_idx, ]
+  test <- data[test_idx, ] # Test og training subsets vælges 
+  
+  y_train <- train[[response]]
+  y_test  <- test[[response]] # Vi ekstraherer det tal vi ønsker at finde, i vores tilfælde tilskuere
+  
+  formula <- as.formula(paste(response, "~ .")) # Laver en ligning der sætter tilskuere mod alle andre predictors
+  
+  # ----------------- Best Subset Selection -----------------
+  k <- 10
+  folds <- sample(rep(1:k, length.out = nrow(train))) # Tildeler tilfældigt hver training row til et af de 10 folds. 
+  cv.errors <- matrix(NA, k, ncol(train) - 1) # En tom matrix til at gemme MSE for hver fold og subset størrelse, bliver brugt i for loop 
+                                              # subset størrelse kan f.eks. være subset 4 = model med 4 kolonner/predictors.
+  
+  for (j in 1:k) { # Loop over hver fold. regsubsets() finder de bedste modeller med 1 til p predictors.
+                   # Vi vælger alle rækker der ikke tilhører fold j, så der trænes på 9 folds eller 9/10 af data
+    best.fit.cv <- regsubsets(formula, data = train[folds != j, ], nvmax = ncol(train) - 1)
+    
+    for (i in 1:(ncol(train) - 1)) { # Loop over hver subset størrelse (med 1 predictor, 2 predictor, 3 predictor osv.) inde i hver fold.
+                                     # predict.regsubsets(...) laver prediktioner på fold "j" (test fold) med subset størrelsen "i"
+                                     # mean(...) beregner MSE for hver fold "j" og subset størrelse "i". cv.errors får tildelt MSE
+                                     # Dette gøres for at finde den subset model der har lavest fejl. F.eks. subset 3 med 3 predictors
+      pred <- predict.regsubsets(best.fit.cv, train[folds == j, ], id = i, formula = formula)
+      cv.errors[j, i] <- mean((train[[response]][folds == j] - pred)^2)
+    }
+  }
+  
+  best.size <- which.min(colMeans(cv.errors)) # colMeans() giver gennemsnittet af hver kolonne MSE på tværs af alle 10 folds. 
+                                              # which.min() giver kolonnen (model) med mindst gennemsnitlige MSE.
+                                              # vi får altså den model der giver den bedste balance mellem bias og variance
+  best.fit <- regsubsets(formula, data = train, nvmax = best.size) # regsubsets(...) laver best subset selection på alt træningsdata 
+                                                                   # og bruger best.size antal kolonner
+  best.pred <- predict.regsubsets(best.fit, test, id = best.size, formula = formula) # Funktion vi lavede tidligere
+  best_subset_rmse <- sqrt(mean((best.pred - y_test)^2)) # Vi udregner først residualerne, forskellen mellem de predictede og faktiske værdier
+                                                         # Derefter kvadreret fejl ^2 for at finde MSE, findes gennemsnittet med mean()
+                                                         # til sidst kvadratrod for "root mean squared error"
+                                                         # Vi bruger RMSE fordi tallet er i samme enhed som tilskuere og er let at forstå
+  best_subset_coef <- coef(best.fit, best.size) # Trækker de valgte predictors ud fra modellen for at vise dem i resultatet
+  
+  # ----------------- Ridge Regression -----------------
+  x_train <- model.matrix(formula, train)[, -1] # model.matrix() beskrevet overfor. Vi bruger -1 subset for at fjerne Intercept rækken
+  x_test  <- model.matrix(formula, test)[, -1]
+  
+  ridge.cv <- cv.glmnet(x_train, y_train, alpha = 0) # cv.glmnet(...) deler træningsdata i 10 folds, alpha = 0 vælger Ridge
+                                                     # den laver ridge regression for mange værdier af regulariseringsstyrken λ lambda
+                                                     # og tester hver model ved cross validation. 
+                                                     # Så finder den værdien af λ lambda der har lavest MSE
+  ridge.pred <- predict(ridge.cv, newx = x_test, s = ridge.cv$lambda.min)
+  ridge_rmse <- sqrt(mean((ridge.pred - y_test)^2))
+  ridge_coef <- as.matrix(coef(ridge.cv, s = "lambda.min")) # coef() trækker koefficienterne ud så de vises i resultaterne
+  
+  # ----------------- Lasso Regression -----------------
+  lasso.cv <- cv.glmnet(x_train, y_train, alpha = 1)
+  lasso.pred <- predict(lasso.cv, newx = x_test, s = lasso.cv$lambda.min)
+  lasso_rmse <- sqrt(mean((lasso.pred - y_test)^2))
+  lasso_coef <- as.matrix(coef(lasso.cv, s = "lambda.min"))
+  
+  # ----------------- PCR -----------------
+  # Fit PCR-modellen på træningsdata, scale = TRUE  → skalerer alle variabler (PCR/PLS kræver standardisering)
+  # validation = "CV" → udfører cross-validation for at vurdere hvor mange Principal Components der skal bruges
+  # PCR vælger Principal komponenter der forklarer X bedst
+  pcr.fit <- pcr(formula, data = train, scale = TRUE, validation = "CV")
+  max_comp <- min(nrow(train) - 1, ncol(train) - 1) # Maksimalt tilladte komponenter (kan ikke overstige antal rækker eller antal prædiktorer)
+  cv_msep <- MSEP(pcr.fit)$val[1,1,] # Hent CV-fejl (MSEP) for hvert komponent-antal MSEP(...) viser [statistic, response, component]
+  best_pcr_ncomp <- min(which.min(cv_msep), max_comp) # which.min(cv_msep) finder antal komponenter med lavest MSEP
+                                                      # min() sikrer at vi ikke går over max_comp
+  pcr.pred <- predict(pcr.fit, newdata = test, ncomp = best_pcr_ncomp) # Forudsig testdata med det optimale antal komponenter
+  pcr_rmse <- sqrt(mean((pcr.pred - y_test)^2)) # Beregn RMSE på testdata
+  
+  # ----------------- PLS -----------------
+  # PLS vælger Latente komponenter der forklarer Y bedst
+  pls.fit <- plsr(formula, data = train, scale = TRUE, validation = "CV") # plsr(...) fungerer på samme måde som pcr(...) men 
+                                                                          # finder optimalt antal latent components i stedet.
+  cv_msep_pls <- MSEP(pls.fit)$val[1,1,]
+  best_pls_ncomp <- min(which.min(cv_msep_pls), max_comp)
+  pls.pred <- predict(pls.fit, newdata = test, ncomp = best_pls_ncomp)
+  pls_rmse <- sqrt(mean((pls.pred - y_test)^2))
+  
+  # ----------------- Returner resultater -----------------
+  list(
+    RMSE = tibble(
+      Model = c("Best subset", "Ridge", "Lasso", "PCR", "PLS"),
+      RMSE = c(best_subset_rmse, ridge_rmse, lasso_rmse, pcr_rmse, pls_rmse)
+    ),
+    BestSubset = list(coef = best_subset_coef, size = best.size),
+    Ridge = list(coef = ridge_coef, lambda_min = ridge.cv$lambda.min),
+    Lasso = list(coef = lasso_coef, lambda_min = lasso.cv$lambda.min),
+    PCR = list(ncomp = best_pcr_ncomp, model = pcr.fit),
+    PLS = list(ncomp = best_pls_ncomp, model = pls.fit)
+  )
+}
+
+# Kør modeller på de udvalgte variabler
+results_tilskuere <- run_all_models(vff_variabler, "tilskuere")
+results_10 <- run_all_models(vff_10, "tilskuere")
+results_7  <- run_all_models(vff_7, "tilskuere")
+results_3  <- run_all_models(vff_3, "tilskuere")
+
+results_tilskuere
+results_10
+results_7
+results_3
+
