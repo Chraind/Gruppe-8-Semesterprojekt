@@ -446,21 +446,30 @@ query <- "SELECT
               k.d3_tilskuere
           FROM vff_kampdata_upload AS v
           
-          -- Join with wide_data on kamp_dato
+          -- Join wide_data på kamp_dato
           LEFT JOIN wide_data AS w
               ON v.kamp_dato = w.kamp_dato
           
-          -- Join with alle_helligdage on date (converted to DATE)
+          -- Join alle_helligdage på date
           LEFT JOIN alle_helligdage AS h
               ON v.kamp_dato = h.date
           
-          -- Join with viborg_befolkning_komplet on year only (one row per year)
+          -- Join viborg_befolkning_komplet på år
           LEFT JOIN viborg_befolkning_komplet AS b
               ON v.kamp_dato = b.kamp_dato
           
-          -- Join with vffkort01 on kamp_dato
+          -- Join vffkort01 på kamp_dato
           LEFT JOIN vffkort01 AS k
-              ON v.kamp_dato = k.kamp_dato;
+              ON v.kamp_dato = k.kamp_dato
+              
+          -- WHERE fjerner værdier under 0
+          WHERE v.tilskuere > 0
+          
+          -- Hvis flere rækker kamp_dato, behold kun 1
+          GROUP BY v.kamp_dato
+          
+          -- Behold grupper hvor der findes 1 kamp på den dato
+          HAVING COUNT(v.kamp_dato) = 1;
           "
 
 # Run the query and get the result as a data frame in R

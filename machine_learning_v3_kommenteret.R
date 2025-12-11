@@ -196,8 +196,104 @@ results_10
 results_7
 results_3
 
+### Prædiktion på nye data (fx best-case/worst-case scenario for de første kampe i foråret)
+# lineær model
+lm.fit <- results_tilskuere$Linear$model
 
-# Fortolkning
+# --- BEST CASE scenario ---
+best_case <- tibble(
+  runde = 20,
+  år = 2026,
+  ugedag = factor("Søn", levels = levels(vff_variabler$ugedag)),
+  tidsgruppe = factor("midt", levels = levels(vff_variabler$tidsgruppe)),
+  seneste_kamp = factor("vundet", levels = levels(vff_variabler$seneste_kamp)),
+  vff_vundet_2 = 1,
+  regn_gruppe = factor("ingen regn", levels = levels(vff_variabler$regn_gruppe)),
+  temperatur = 8,                    # forårsvejr
+  vind = 3,                          # mild vind
+  akk_indbyggertal = 10246,
+  kamp_gruppe = factor("stor", levels = levels(vff_variabler$kamp_gruppe)),
+  ferie_flag = factor("nej", levels = levels(vff_variabler$ferie_flag))
+)
+
+# --- WORST CASE scenario ---
+worst_case <- tibble(
+  runde = 20,
+  år = 2026,
+  ugedag = factor("Søn", levels = levels(vff_variabler$ugedag)),
+  tidsgruppe = factor("sent", levels = levels(vff_variabler$tidsgruppe)),
+  seneste_kamp = factor("tabt", levels = levels(vff_variabler$seneste_kamp)),
+  vff_vundet_2 = 0,
+  regn_gruppe = factor("meget regn", levels = levels(vff_variabler$regn_gruppe)),
+  temperatur = -5,                    # koldt
+  vind = 20,                         # kraftig vind
+  akk_indbyggertal = 10246,
+  kamp_gruppe = factor("stor", levels = levels(vff_variabler$kamp_gruppe)),
+  ferie_flag = factor("nej", levels = levels(vff_variabler$ferie_flag))
+)
+
+# --- 3) Predict med 95% prediktionsinterval (point estimate + interval for nye observationer) ---
+pred_best <- predict(lm.fit, newdata = best_case, interval = "prediction", level = 0.95)
+pred_worst <- predict(lm.fit, newdata = worst_case, interval = "prediction", level = 0.95)
+
+# Saml resultater
+results <- tibble(
+  Scenario = c("Best case", "Worst case"),
+  Fit = c(pred_best[ , "fit"], pred_worst[ , "fit"]),
+  PI_lower = c(pred_best[ , "lwr"], pred_worst[ , "lwr"]),
+  PI_upper = c(pred_best[ , "upr"], pred_worst[ , "upr"])
+)
+
+print(results)
+
+# --- 4) Ekstra: Simpel følsomhedsanalyse på temperatur og regn (valgfrit) ---
+temps <- seq(-2, 12, by = 2)
+preds_temp <- sapply(temps, function(t) {
+  nd <- best_case
+  nd$temperatur <- t
+  predict(lm.fit, newdata = nd)
+})
+sensitivity <- data.frame(temperatur = temps, tilskuere_est = as.numeric(preds_temp))
+print(sensitivity)
+
+# Define a range for akk_indbyggertal (e.g., ±20% around median)
+pop_range <- seq(
+  0.8 * 10246,
+  1.2 * 10246,
+  length.out = 10
+)
+
+# Predict tilskuere for each population value
+preds_pop <- sapply(pop_range, function(pop) {
+  nd <- best_case
+  nd$akk_indbyggertal <- pop
+  predict(lm.fit, newdata = nd)
+})
+
+# Put results in a data.frame
+sensitivity_pop <- data.frame(
+  akk_indbyggertal = pop_range,
+  tilskuere_est = as.numeric(preds_pop)
+)
+
+print(sensitivity_pop)
+coef(lm.fit)["akk_indbyggertal"]
+
+plot(vff_variabler$akk_indbyggertal, vff_variabler$tilskuere,
+     xlab = "Akkumuleret indbyggertal",
+     ylab = "Tilskuere",
+     main = "Tilskuere vs Akk. indbyggertal")
+abline(lm(tilskuere ~ akk_indbyggertal, data = vff_variabler), col="red")
+
+# Sammenlign resultatet med formålet med undersøgelsen.
+# Vi kan se i best case at når vejret er godt og når VFF har vundet de sidste to kampe osv. så kommer der flere tilskuere til kampen.
+# Det stemmer overens med formålet for at lave machine learning modellen. 
+# Den giver et godt billede af hvor mange der kommer til kampen.
+
+# Hvis du vil gemme resultater:
+# write.csv(results, "predictions_VFF_vs_BFF_2026-02-15.csv", row.names = FALSE)
+
+# Sammenligning af test_RMSE
 # results_tilskuere:
 # Uden billetsalg klarer den lineære funktion og PLS bedst. RMSE på den lineære ligger på 1125 og PLS 1129. Lasso ligger også tæt på 1151
 # med en anden seed kan de godt bytte plads.
@@ -208,9 +304,11 @@ results_3
 # Lasso, PLS, best subset og den lineære regression klarer sig bedst
 # PCR og Ridge bliver ustabile, når vi tilføjer den stærke predictor (billetsalg)
 
+#
+# Evaluering 
+# 
 
 # Hvordan er Test-MSE sammenlignet med CV-MSE
-# 
 # results_tilskuere:
 # Vi har brugt RMSE til at vurdere modellerne. Når de omregnes til CV_RMSE ligger de tæt på test_RMSE.
 # Dette indikerer at cross validation processen giver en pålidelig vurdering af fejl uden for datasættet
@@ -223,4 +321,98 @@ results_3
 # Best subset selection, Lasso og PLS klarer sig bedst og man kan vurdere billetsalg er en stærk predictor
 # Ridge klarer sig ringere og ringere i test_RMSE. Dette sker fordi Ridge laver alle predictors tættere på 0, også den stærke billetsalg
 # PCR bliver ustabil i test_RMSE - det kan tyde på overfitting
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ===============================
+# 1) Hent lineær model fra run_all_models
+# ===============================
+lm.fit <- results_tilskuere$Linear$model
+
+# ===============================
+# 2) Opret best-case og worst-case newdata
+# ===============================
+best_case <- tibble(
+  runde = median(vff_variabler$runde),
+  år = 2026,
+  ugedag = factor("Søn", levels = levels(vff_variabler$ugedag)),
+  tidsgruppe = factor("midt", levels = levels(vff_variabler$tidsgruppe)),
+  seneste_kamp = factor("vundet", levels = levels(vff_variabler$seneste_kamp)),
+  vff_vundet_2 = 1,
+  regn_gruppe = factor("ingen regn", levels = levels(vff_variabler$regn_gruppe)),
+  temperatur = 8,
+  vind = 3,
+  akk_indbyggertal = 10500,
+  kamp_gruppe = factor("stor", levels = levels(vff_variabler$kamp_gruppe)),
+  ferie_flag = factor("nej", levels = levels(vff_variabler$ferie_flag))
+)
+
+worst_case <- tibble(
+  runde = median(vff_variabler$runde),
+  år = 2026,
+  ugedag = factor("Søn", levels = levels(vff_variabler$ugedag)),
+  tidsgruppe = factor("sent", levels = levels(vff_variabler$tidsgruppe)),
+  seneste_kamp = factor("tabt", levels = levels(vff_variabler$seneste_kamp)),
+  vff_vundet_2 = 0,
+  regn_gruppe = factor("meget regn", levels = levels(vff_variabler$regn_gruppe)),
+  temperatur = 1,
+  vind = 10,
+  akk_indbyggertal = 10000,
+  kamp_gruppe = factor("stor", levels = levels(vff_variabler$kamp_gruppe)),
+  ferie_flag = factor("nej", levels = levels(vff_variabler$ferie_flag))
+)
+
+# ===============================
+# 3) Funktion til sikker newdata
+# ===============================
+safe_newdata <- function(model, newdata) {
+  vars <- all.vars(formula(model))[-1]   # alle predictors, ikke respons
+  newdata <- newdata[, vars, drop = FALSE]
+  
+  # match factor-levels med model
+  for (v in names(newdata)) {
+    if (is.factor(model$model[[v]])) {
+      newdata[[v]] <- factor(newdata[[v]], levels = levels(model$model[[v]]))
+    }
+  }
+  newdata
+}
+
+best_case  <- safe_newdata(lm.fit, best_case)
+worst_case <- safe_newdata(lm.fit, worst_case)
+
+# ===============================
+# 4) Predict med 95% prediktionsintervaller
+# ===============================
+pred_best  <- predict(lm.fit, newdata = best_case, interval = "prediction", level = 0.95)
+pred_worst <- predict(lm.fit, newdata = worst_case, interval = "prediction", level = 0.95)
+
+# ===============================
+# 5) Saml resultater i en tabel
+# ===============================
+results <- tibble(
+  Scenario = c("Best case", "Worst case"),
+  Fit      = c(pred_best[,"fit"], pred_worst[,"fit"]),
+  PI_lower = c(pred_best[,"lwr"], pred_worst[,"lwr"]),
+  PI_upper = c(pred_best[,"upr"], pred_worst[,"upr"])
+)
+
+results
+
 
