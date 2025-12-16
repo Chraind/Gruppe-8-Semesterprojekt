@@ -2,58 +2,35 @@ pacman::p_load(tidyverse, leaps, glmnet, pls)
 
 # Indlæs data fra data_cleaning.R script
 data_clean <- readRDS("data/joined_data_clean.rds")
-view(data_clean)
+options(scipen = 999)
 
 # Variabelvalg til machine learning modeller
-
 # Før 10 dage før kampen (ingen billetsalg endnu)
 vff_variabler <- data_clean %>%
   select(tilskuere, runde, år, ugedag, tidsgruppe,
          seneste_kamp, vff_vundet_2, regn_gruppe,
          temperatur, vind, akk_indbyggertal, kamp_gruppe, ferie_flag) %>% na.omit()
 
-# 10 dage før kampen (salg og fraktion tilgængelig)
+# 10 dage før kampen
 vff_10 <- data_clean %>%
-  select(tilskuere, salg_10, frak_10, runde, år, ugedag, tidsgruppe,
+  select(tilskuere, salg_10, runde, år, ugedag, tidsgruppe,
          seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>%  na.omit()
 
-# 7 dage før kampen (akkumuleret salg og fraktion)
+# 7 dage før kampen
 vff_7 <- data_clean %>%
-  mutate(
-    salg_7_akk = salg_10 + salg_7,
-    frak_7_akk = frak_10 + frak_7
-  ) %>%
-  select(tilskuere, salg_7_akk, frak_7_akk, runde, år, ugedag, tidsgruppe,
+  select(tilskuere, salg_10, salg_7, runde, år, ugedag, tidsgruppe,
          seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>% na.omit()
 
-# 3 dage før kampen (akkumuleret salg og fraktion)
+# 3 dage før kampen
 vff_3 <- data_clean %>%
-  mutate(
-    salg_3_akk = salg_10 + salg_7 + salg_3,
-    frak_3_akk = frak_10 + frak_7 + frak_3
-  ) %>%
-  select(tilskuere, salg_3_akk, frak_3_akk, runde, år, ugedag, tidsgruppe,
+  select(tilskuere, salg_10, salg_7, salg_3, runde, år, ugedag, tidsgruppe,
          seneste_kamp, vff_vundet_2, akk_indbyggertal, kamp_gruppe, ferie_flag) %>% na.omit()
 
-### note: Jeg har også prøvet at dividere billetsalg med fraktion, og dette giver et "perfekt" prediktion.
-#         men jeg tror at vi bare skal have akkumuleret tal for at få det mest forståelige RMSE resultat
-# 
-# mutate(
-# salg_3_akkumuleret = salg_10 + salg_7 + salg_3,
-# frak_3_akkumuleret = frak_10 + frak_7 + frak_3,
-# tilskuere_est = salg_3_akkumuleret / frak_3_akkumuleret'
-# )
-# 
-# mutate(
-# salg_7_akkumuleret = salg_10 + salg_7,
-# frak_7_akkumuleret = frak_10 + frak_7,
-# tilskuere_est = salg_7_akkumuleret / frak_7_akkumuleret
-# )
-# 
-# mutate(
-# tilskuere_est = salg_10 / frak_10
-# )
-
+#Inspekt
+glimpse(vff_variabler)
+glimpse(vff_10)
+glimpse(vff_7)
+glimpse(vff_3)
 
 # Funktion til predict i best subset selection
 predict.regsubsets <- function(object, newdata, id, formula) {
@@ -200,12 +177,12 @@ results_3
 # lineær model
 lm.fit <- results_tilskuere$Linear$model
 
-# --- BEST CASE scenario ---
+# --- BEST CASE scenario --- VFF-BIF spiller søndag d. 15/2 i runde 20, hjemmekamp
 best_case <- tibble(
   runde = 20,
   år = 2026,
   ugedag = factor("Søn", levels = levels(vff_variabler$ugedag)),
-  tidsgruppe = factor("midt", levels = levels(vff_variabler$tidsgruppe)),
+  tidsgruppe = factor("sent", levels = levels(vff_variabler$tidsgruppe)),
   seneste_kamp = factor("vundet", levels = levels(vff_variabler$seneste_kamp)),
   vff_vundet_2 = 1,
   regn_gruppe = factor("ingen regn", levels = levels(vff_variabler$regn_gruppe)),
@@ -213,7 +190,7 @@ best_case <- tibble(
   vind = 3,                          # mild vind
   akk_indbyggertal = 10246,
   kamp_gruppe = factor("stor", levels = levels(vff_variabler$kamp_gruppe)),
-  ferie_flag = factor("nej", levels = levels(vff_variabler$ferie_flag))
+  ferie_flag = factor("ja", levels = levels(vff_variabler$ferie_flag))
 )
 
 # --- WORST CASE scenario ---
@@ -229,7 +206,7 @@ worst_case <- tibble(
   vind = 20,                         # kraftig vind
   akk_indbyggertal = 10246,
   kamp_gruppe = factor("stor", levels = levels(vff_variabler$kamp_gruppe)),
-  ferie_flag = factor("nej", levels = levels(vff_variabler$ferie_flag))
+  ferie_flag = factor("ja", levels = levels(vff_variabler$ferie_flag))
 )
 
 # --- 3) Predict med 95% prediktionsinterval (point estimate + interval for nye observationer) ---
@@ -295,18 +272,18 @@ abline(lm(tilskuere ~ akk_indbyggertal, data = vff_variabler), col="red")
 
 # Sammenligning af test_RMSE
 # results_tilskuere:
-# Uden billetsalg klarer den lineære funktion og PLS bedst. RMSE på den lineære ligger på 1125 og PLS 1129. Lasso ligger også tæt på 1151
+# Uden billetsalg klarer den lineære funktion og PLS bedst. RMSE på den lineære ligger på 1164 og PLS 1170. Lasso ligger også tæt på 1176
 # med en anden seed kan de godt bytte plads.
 # Lasso og Ridge skrumper nogle af koefficienterne, men det ligner at der ikke er nogen stærk multikollinearitet eller unødvendige variabler
 # PCR klarer sig ikke så godt - det kan tyde på overfitting
 # 
 # results_10, results_7, results_3
-# Lasso, PLS, best subset og den lineære regression klarer sig bedst
-# PCR og Ridge bliver ustabile, når vi tilføjer den stærke predictor (billetsalg)
+# RMSE værdierne falder gradvist når vi tilføjer de stærke predictors som er billetsalg. Alle modellerne ligger tæt på hinanden
+# men PCR bliver lidt højere end de andre. 
 
 #
 # Evaluering 
-# 
+# Vi vælger den lineære model, da den er simplest og har sammen med PLS og Lasso den laveste test_RMSE
 
 # Hvordan er Test-MSE sammenlignet med CV-MSE
 # results_tilskuere:

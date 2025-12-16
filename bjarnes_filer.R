@@ -3,8 +3,8 @@ pacman::p_load(tidyverse, janitor, rvest, lubridate, stringi, httr, jsonlite, pu
 # ctrl alt i = kode chunk i quarto
 
 
-fcidk <- readRDS("fcidk.rds")
-vffkort01 <- readRDS("vffkort01.rds")
+fcidk <- readRDS("data/fcidk.rds")
+vffkort01 <- readRDS("data/vffkort01.rds")
 view(fcidk)
 view(vffkort01)
 
@@ -17,7 +17,7 @@ library(DBI)
 library(RSQLite)
 
 # Connect to the SQLite database
-con <- dbConnect(RSQLite::SQLite(), "fodbolddata.sqlite")
+con <- dbConnect(RSQLite::SQLite(), "data/fodbolddata.sqlite")
 
 # List all tables
 dbListTables(con)

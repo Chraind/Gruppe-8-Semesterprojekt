@@ -69,7 +69,6 @@ joined_data <- joined_data %>%
       labels = c("nej", "ja")
     )
   )
-view(joined_data)
 
 # Tilføj salg_3, salg_7, salg_10 kolonner ud fra d3_tilskuere, d7_tilskuere, d10_tilskuere til brug i ML model
 joined_data <- joined_data %>% 
@@ -77,9 +76,6 @@ joined_data <- joined_data %>%
     salg_10 = d10_tilskuere,                # billetter solgt 10 dage før
     salg_7  = d7_tilskuere - d10_tilskuere, # yderligere billetter solgt mellem dag 10 og 7
     salg_3  = d3_tilskuere - d7_tilskuere,  # yderligere billetter solgt mellem dag 7 og 3
-    frak_10 = d10,                  # fraktion på dag 10
-    frak_7  = d7 - d10,             # fraktion steget mellem dag 10 og 7
-    frak_3  = d3 - d7               # fraktion steget mellem dag 7 og 3
   )
 
 # Gem renset data

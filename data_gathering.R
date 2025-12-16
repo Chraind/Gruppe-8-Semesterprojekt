@@ -36,7 +36,7 @@ tryCatch({
     page <- read_html(url, encoding = "UTF-8")
     individuel_sæson <- sæson_år[i]
     
-    # Extract all tables as HTML nodes
+    # Ekstraher alle tables som HTML nodes
     table_nodes <- page %>% html_nodes("table")
     
     for (tbl_node in table_nodes) {
@@ -79,17 +79,6 @@ tryCatch({
   # Denne del kører kun hvis der sker en fejl
   cat(" Fejl ved hentning af data for", year, ":", e$message, "\n")  
 })
-
-
-######
-#####
-###
-# TODO: upload scraped data til SQL databasen
-###
-####
-#####
-
-
 
 # ---- HENT DATA FRA DATE.NAGER.AT ---- #
 alle_helligdage <- tibble()
@@ -276,9 +265,6 @@ vff_kampdata <- vff_kampdata_upload %>%
   )
 
 
-
-
-
 # ---- DATALAGRING ---- #
 # Gem RDS
 saveRDS(vff_kampdata, "data/vff_kampdata.rds")
@@ -288,15 +274,16 @@ vff_kampdata <- readRDS("data/vff_kampdata.rds")
 
 # ---- SE RESULTAT ---- #
 view(vff_kampdata)
+
+# ---- HENT DMI DATA ---- #
 # 1. Læs kampdatoer
 datoer <- as.Date(vff_kampdata$kamp_dato, format = "%d-%m-%Y")
 
 # 2. API-parametre
 base_url <- "https://dmigw.govcloud.dk/v2/metObs/collections/observation/items?"
 stationId <- "stationId=06065"  # års Syd
-apikey <- "api-key=219f3da7-1f91-4cb4-83e8-d19e2f03fb48"
-
 readRenviron("~/.Renviron")
+apikey <- paste0("api-key=", Sys.getenv("DMI_API_KEY"))
 
 # 3. Samlet dataframe
 all_data <- data.frame()
@@ -342,6 +329,9 @@ for (date in datoer) {
   }
 }
 
+# Tjek om den har hentet data
+names(all_data)
+
 # 5. Klargør data til wide format
 wide_data <- all_data %>%
   select(kamp_dato, observed, parameterId, value) %>%
@@ -352,8 +342,6 @@ wide_data <- all_data %>%
   pivot_wider(names_from = parameterId, values_from = value) %>%
   rename(regn = precip_past1h, temperatur = temp_mean_past1h, vind = wind_gust_always_past1h) %>%
   arrange(kamp_dato, observed)
-
-view(wide_data)
 
 #### gem og load RDS
 # saveRDS(vff_kampdata_upload, "data/vff_kampdata_upload.rds")
@@ -367,26 +355,27 @@ viborg_befolkning_komplet <- readRDS("data/viborg_befolkning_komplet.rds")
 wide_data <- readRDS("data/wide_data.rds")
 vffkort01 <- readRDS("data/vffkort01.rds")
 
-# inspekt data
+# Inspekt data
 glimpse(wide_data)
 glimpse(viborg_befolkning_komplet)
 glimpse(alle_helligdage)
 glimpse(vff_kampdata_upload)
 glimpse(vffkort01)
 
-# giv vffkort01 kamp_dato variable
+# Giv vffkort01 kamp_dato variable
 vffkort01 <- vffkort01 %>%
   left_join(
     vff_kampdata_upload %>%
-      select(år, tilskuere, kamp_dato),  # keep only relevant columns
+      select(år, tilskuere, kamp_dato),
     by = c("år", "tilskuere")
   )
+view(vffkort01)
 
-# ændre format
+# Ændre format i viborg_befolkning_komplet og alle_helligdage
 viborg_befolkning_komplet$år <- as.double(viborg_befolkning_komplet$år)
 alle_helligdage$date <- as.Date(alle_helligdage$date)
 
-# giv viborg_befolkning_komplet kamp_dato variable
+# Giv viborg_befolkning_komplet kamp_dato variable
 viborg_befolkning_komplet <- viborg_befolkning_komplet %>% 
   select(år, Indbyggere_Viborg_Kommune) %>% 
   group_by(år) %>% 
@@ -397,20 +386,7 @@ viborg_befolkning_komplet <- viborg_befolkning_komplet %>%
     by = "år"
   )
 
-# Vi mangler at lave gennemsnitsdata for 3, 7 og 10 dage.
-# Philip, jeg fik det til at virke, men så opstod der et problem med API-nøglen og dokumentet.
-# Jeg tænker, at vi skal have en funktion, der tager udgangspunkt i en given dato, lægger et antal obsivisationer til kampdatoen og
-# finder det samlede gennemsnit for perioden.
-
-
-# readRenviron("~/.Renviron")
-
-# con <- dbConnect(odbc(), Driver = "ODBC Driver 18 for SQL Server",
-#                  Server = "lassesqlserver.database.windows.net", Database = "lasseDatabase",
-#                  Port = "1433", UID = Sys.getenv("sqlusername"), PWD = Sys.getenv("sqlpassword"))
-
-#Opsætning og tilslutning til lokal sql db
-
+# Join i SQLLite
 con <- dbConnect(RSQLite::SQLite(), "data/VFF_data.sqlite")
 
 uploadtables <- list(
@@ -438,9 +414,6 @@ query <- "SELECT
               w.vind,
               h.localName AS helligdag,
               b.Indbyggere_Viborg_Kommune,
-              k.d10,
-              k.d7,
-              k.d3,
               k.d10_tilskuere,
               k.d7_tilskuere,
               k.d3_tilskuere
@@ -477,9 +450,6 @@ joined_data <- dbGetQuery(con, query) %>%
   mutate(kamp_dato = as.Date(kamp_dato))
 
 saveRDS(joined_data, "data/joined_data.rds")
-joined_data <- readRDS("data/joined_data.rds")
-
-view(joined_data)
 
 dbDisconnect(con)
 
