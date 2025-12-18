@@ -302,7 +302,7 @@ Reference fx fra interviews bla.bla..bla...
 
 Dataarbejdet hos VFF bearbejdes lokalt på computerne, lagres ved excel
 filer og uden særlige fælles standarder. Vi vurderer VFF til at ligge et
-sted mellem step 1 og step 2 i følge Alexandra modellen. Men der er
+sted mellem step 1 og step 2 i følge Alexandra modellen [@alexandrainstituttetFindVejDin2024]. Men der er
 bevidsthed omkring datastrukturen, og der er fokus på at få en mere
 ensrettet datastruktur:
 
