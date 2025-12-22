@@ -284,9 +284,6 @@ kan anvendes strategisk, skal organisationen løftes datamæssigt.
 
 ## Literaturliste
 
-Reference fx fra interviews bla.bla..bla...
-[@transskriberede_interviews] eller en bog [@bang_2025] osv
-
 ::: {#refs}
 :::
 
@@ -296,15 +293,17 @@ Reference fx fra interviews bla.bla..bla...
 
 ## Bilag
 
+Link til GitHub: https://github.com/Chraind/Gruppe-8-Semesterprojekt/tree/lassedev 
+
 ### Analyser
 
 #### Datamodenhedsanalyse (Alexandremodellen og 5 Levels of Data Maturity)
 
 Dataarbejdet hos VFF bearbejdes lokalt på computerne, lagres ved excel
 filer og uden særlige fælles standarder. Vi vurderer VFF til at ligge et
-sted mellem step 1 og step 2 i følge Alexandra modellen [@alexandrainstituttetFindVejDin2024]. Men der er
-bevidsthed omkring datastrukturen, og der er fokus på at få en mere
-ensrettet datastruktur:
+sted mellem step 1 og step 2 i følge Alexandra modellen
+[@alexandra_FindDinVej]. Men der er bevidsthed omkring datastrukturen,
+og der er fokus på at få en mere ensrettet datastruktur:
 
 Spg: “Hvem tager beslutninger omkring hvilke systemer der skal bruges? D
 – meget forskellige, det er mest de forskellige afdelinger der bestemmer
@@ -316,7 +315,7 @@ A – man skal huske og se på virksomheden, der har eksisteret i mange år
 og udviklet sig rigtig meget de seneste år\
 A – opfatter at de bevæger sig væk fra 3. parts .. og får en mere
 ensrettet datastruktur – men det er ikke noget der sker dag til dag, det
-er en længere process“ (interview data, 2025)
+er en længere process“ [@vff_interview_2025]
 
 Klubben er ikke helt på nulpunktet, hvor virksomheden ikke har nogen
 form for bevidsthed og struktur i brug af data i forretningen og
@@ -1975,12 +1974,9 @@ results_3
 Sammenligning på RMSE på modellerne i results_tilskuere, som er uden
 billetsalg.
 
-Den lineære funktion har test RMSE på 1164 
-Best subset selection - Test RMSE på 1418 
-Lasso - Test RMSE på 1176 
-Ridge regression - Test RMSE på 1171 
-PCR - Test RMSE på 1291 
-PLS - Test RMSE på 1170
+Den lineære funktion har test RMSE på 1164 Best subset selection - Test
+RMSE på 1418 Lasso - Test RMSE på 1176 Ridge regression - Test RMSE på
+1171 PCR - Test RMSE på 1291 PLS - Test RMSE på 1170
 
 Den lineære regression klarer sig bedst. Men Ridge, Lasso og PLS ligger
 også tæt på. Med en anden seed kunne de godt bytte plads.
@@ -1999,37 +1995,60 @@ tæt på hinanden, men PCR bliver lidt højere end de andre.
 
 ### Evaluering
 
-Vi vælger den lineære model til at predict worst case og best case, da den er simplest og har sammen med PLS og Lasso den laveste test_RMSE. 
+Vi vælger den lineære model til at predict worst case og best case, da
+den er simplest og har sammen med PLS og Lasso den laveste test_RMSE.
 
-Til interviewet fik vi fortalt at vejret ikke havde så stor betydning, men i vores model har regn_gruppe_meget_regn en stor betydning. Vi har ikke mange data over fodboldkampe der er spillet med meget regn, så det kan være en tilfældighed. Men det giver mening at mindre kommer til kampen når der er høj regn.
+Til interviewet fik vi fortalt at vejret ikke havde så stor betydning,
+men i vores model har regn_gruppe_meget_regn en stor betydning. Vi har
+ikke mange data over fodboldkampe der er spillet med meget regn, så det
+kan være en tilfældighed. Men det giver mening at mindre kommer til
+kampen når der er høj regn.
 
-Akk_indbyggertal burde have en positiv indflydelse på tilskuere, men den har næsten ingen effekt på modellen, den ligger på -0,38 på modellen uden billetsalg. Den er måske skubbet i den negative retning på grund af andre predictors i datasættet. 
+Akk_indbyggertal burde have en positiv indflydelse på tilskuere, men den
+har næsten ingen effekt på modellen, den ligger på -0,38 på modellen
+uden billetsalg. Den er måske skubbet i den negative retning på grund af
+andre predictors i datasættet.
 
 #### Hvordan er Test-RMSE sammenlignet med CV-RMSE
 
-results_tilskuere:
-Best subset selection - Test RMSE på 1418 og CV RMSE på 1434. De ligger ret tæt på hinanden
-Ridge regression - Test RMSE på 1171 og CV RMSE på 1306. Test RMSE ligger tydeligt lavere, det kunne skyldes at vi ikke har ret meget data at teste på, og det giver en lidt heldig split som passer modellen bedre.
-Lasso - Test RMSE på 1176 og CV RMSE på 1282. Minder om Ridge tilfældet
-PCR - Test RMSE på 1291 og CV RMSE på 1344. Tæt på hinanden, test lidt lavere
-PLS - Test RMSE på 1170 og CV RMSE på 1329. Minder også om Ridge tilfældet
+results_tilskuere: Best subset selection - Test RMSE på 1418 og CV RMSE
+på 1434. De ligger ret tæt på hinanden Ridge regression - Test RMSE på
+1171 og CV RMSE på 1306. Test RMSE ligger tydeligt lavere, det kunne
+skyldes at vi ikke har ret meget data at teste på, og det giver en lidt
+heldig split som passer modellen bedre. Lasso - Test RMSE på 1176 og CV
+RMSE på 1282. Minder om Ridge tilfældet PCR - Test RMSE på 1291 og CV
+RMSE på 1344. Tæt på hinanden, test lidt lavere PLS - Test RMSE på 1170
+og CV RMSE på 1329. Minder også om Ridge tilfældet
 
-CV_RMSE ligger generelt lidt højere end test RMSE - det kan tyde på test sættet er lidt lettere end træningsdatasættet. Vi tænker det skyldes en tilfældighed pga. en lille sample size. 
- 
-results_10, results_7, results_3
-Når vi inkluderer billetsalg fra op til 10 dage før kampen, falder fejlene mere og mere. 
-Best subset selection, Lasso og PLS klarer sig bedst og man kan vurdere billetsalg er en stærk predictor.
-Ridge ligger lidt højere end de andre på test_RMSE. Dette sker fordi Ridge laver alle predictors tættere på 0, også den stærke billetsalg predictor. 
-PCR bliver ustabil i test_RMSE - det kan tyde på overfitting
+CV_RMSE ligger generelt lidt højere end test RMSE - det kan tyde på test
+sættet er lidt lettere end træningsdatasættet. Vi tænker det skyldes en
+tilfældighed pga. en lille sample size.
+
+results_10, results_7, results_3 Når vi inkluderer billetsalg fra op til
+10 dage før kampen, falder fejlene mere og mere. Best subset selection,
+Lasso og PLS klarer sig bedst og man kan vurdere billetsalg er en stærk
+predictor. Ridge ligger lidt højere end de andre på test_RMSE. Dette
+sker fordi Ridge laver alle predictors tættere på 0, også den stærke
+billetsalg predictor. PCR bliver ustabil i test_RMSE - det kan tyde på
+overfitting
 
 #### Fortolkning
 
-Vi har lige PT. kun 195 rækker data til vores modeller. Over tiden som VFF får spillet flere kampe i superligaen, henter vores model automatisk ny data fra superstats, DMI, date.nager.at og danmarks statistik, som kommer ind i vores datasæt og bruges i ML modellen. Derfor ændres RMSE værdierne over tiden, og tallene vi har vurderet på er et snapshot af sådan det så ud da vi kørte koden.
+Vi har lige PT. kun 195 rækker data til vores modeller. Over tiden som
+VFF får spillet flere kampe i superligaen, henter vores model automatisk
+ny data fra superstats, DMI, date.nager.at og danmarks statistik, som
+kommer ind i vores datasæt og bruges i ML modellen. Derfor ændres RMSE
+værdierne over tiden, og tallene vi har vurderet på er et snapshot af
+sådan det så ud da vi kørte koden.
 
-Siden datamængden er lille, får vi højere varians. En outlier i test datasættet kan få test RMSE til at flyve i vejret i sammenligning med CV RMSE. I modsætning til det, så hvis test datasættet er lettere end træningsdatasættet bliver test RMSE lavere end CV RMSE.
+Siden datamængden er lille, får vi højere varians. En outlier i test
+datasættet kan få test RMSE til at flyve i vejret i sammenligning med CV
+RMSE. I modsætning til det, så hvis test datasættet er lettere end
+træningsdatasættet bliver test RMSE lavere end CV RMSE.
 
-Billetsalg er den stærkeste forklarende faktor for det endelige tilskuertal. Det kan tydeligt ses når RMSE falder på alle modeller når den er inkluderet. 
-
+Billetsalg er den stærkeste forklarende faktor for det endelige
+tilskuertal. Det kan tydeligt ses når RMSE falder på alle modeller når
+den er inkluderet.
 
 #### Prædiktion på nye data (fx best-case/worst-case scenario for de første kampe i foråret)
 
