@@ -2353,3 +2353,4 @@ plot(vff_variabler$akk_indbyggertal, vff_variabler$tilskuere,
 abline(lm(tilskuere ~ akk_indbyggertal, data = vff_variabler), col="red")
 
 ```
+
