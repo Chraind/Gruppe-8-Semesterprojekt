@@ -102,10 +102,7 @@ Underspørgsmål:
 
 ### Afgrænsning
 
-I projektet fokuseres der kun på hjemmekampe i Superligaen. Vi inddrager
-ikke økonomiske beregninger, og undersøger ikke organisatoriske
-forandringer i detaljer, kun de forhold der direkte påvirker brugen af
-ML-modellen.
+I projektet fokuseres der kun på hjemmekampe i Superligaen. Vi inddrager ikke detaljerede cost-benefit eller return on investment analyser, men forretningsværdien diskuteres kvalitativt, og undersøger ikke organisatoriske forandringer i detaljer, kun de forhold der direkte påvirker brugen af ML-modellen.
 
 ## Videnskabsteori og metode
 
@@ -286,7 +283,7 @@ brugbart værktøj i klubben.
 VFF mangler præcise og rettidige forudsigelser af tilskuertal, hvilket
 påvirker økonomi, drift og fanoplevelse. En ML-baseret model kan skabe
 stor værdi gennem bedre ressourcefordeling, mere effektiv markedsføring
-og forbedret planlægning.
+og forbedret planlægning. Manglende præcise estimater kan føre til over- eller underbemanding, madspild, utilfredse fans og tabte indtægter. 
 
 Analysen viser dog, at klubbens datamodenheden ligger på niveau 1–2, og
 fuld implementering kræver standardisering, bedre dataarkitektur,
@@ -295,7 +292,7 @@ etablere en datadrevet kultur, skabe økonomiske forbedringer og
 professionalisere beslutningsprocesserne.
 
 Det er teknisk muligt at udvikle en prototype-ML-model, men før modellen
-kan anvendes strategisk, skal organisationen løftes datamæssigt.
+kan anvendes strategisk, skal organisationen løftes datamæssigt. Værdien af machine learning modellen bliver altså først realiseret når de organisatoriske og tekniske forudsætninger er på plads.
 
 \newpage
 
@@ -1316,19 +1313,12 @@ kommercielt værdifulde tilskuerprognoser.
 
 #### Hente data fra Superstats og gør dem tidy
 
-Først installerer vi packages vi skal bruge til projektet og loader dem
-med pacman::p_load.
+Først installerer og loader vi de nødvendige R-pakker med pacman::p_load.
 
-Derefter skal vi have en variabel som returnerer de år hvor VFF er i
-superligaen. Den måde vi gør det på, er at vi åbner superstats.dk, hvor
-vi har fundet en tabel der viser de år VFF har været i superligaen. Vi
-finder så den rigtige tabel, ved at kigge på "inspect element"
-"table#sortTable"
+Vi starter med at identificere de år, hvor Viborg FF (VFF) har spillet i Superligaen. Denne information hentes fra superstats.dk. Vi finder den relevante tabel ved hjælp af browserens “inspect element”-funktion, og vælger table#sortTable.
 
-Nu skal vi have den rigtige string ud fra tabellen, der bruger vi
-str_extract, sletter det der kommer før "/", og beholder 4 cifre efter
-/. Disse tal bliver sat ind i en ny variabel vi kalder sæson_år. Den
-returnerer alle årerne efter år 2003, hvor VFF var i superligaen.
+Derefter hentes årstallene fra tabellen med str_extract(). Vi beholder kun fire cifre efter skråstregen / og gemmer dem i en ny variabel sæson_år. Vi filtrerer til år fra 2003 og frem, da det er relevant for vores analyse.
+
 
 ```{r Superstats-sæson}
 pacman::p_load(tidyverse, vroom, janitor, polite, rjstat, rvest, lubridate,
@@ -1356,30 +1346,11 @@ sæson_år <- superliga_table_read %>%
 #       [1] 2026 2025 2024 2023 2022 2017 2016 2014 2008 2007 2006 2005 2004 2003
 ```
 
-Nu skal vi hente alt data fra superstats. Vi bruger sæson_år årstallet
-og sætter ind i en URL kaldt sæson_urls. Nu opretter vi en tibble, hvor
-alt data skal puttes ind i. Vi har to for loops. Det første for loop
-trækker alle tables ud for hvert årstal. Den næste for loop bruges til
-at finde det korrekte information og tage med, vi gør nogle forskellige
-ting for at sikre det. Først ignorerer vi alle tables som ikke
-inkluderer "Runde", dette gøres med en if statement hvor vi bruger
-grepl() til at tjekke om kolonnerne indeholder "Runde".
+Næste skridt er at hente alle data fra Superstats. Vi opretter en liste med URLs for hvert sæsonår og initialiserer en tom tibble, som vi fylder med data.
 
-Så har vi kode til at tage TV kanaler ud. På superstats siden er der
-brugt et ikon billede med navnet af kanalen som en titel. Så vi finder
-billed titlen og trækker den ud. Så bruger vi en if-statement som
-tjekker om de fundne TV kanaler matcher antallet af rækker i datasættet,
-hvis de gør det, tilføjes det som en ny kolonne, ellers sættes værdien
-til NA.
+Vi bruger to for-løkker: Den første trækker alle tabeller ud for hvert år, den anden finder de relevante informationer. Tabeller uden kolonnen “Runde” ignoreres.
 
-Vi bruger janitor datapakken til clean_names(), derefter navngiver
-kolonnerne så vi får en konstant datastruktur. Vi ekstraherer så
-tilskuer variablen som en tekst variabel, fjerner punktum og laver den
-numerisk.
-
-Runde nummer findes i thead og den ekstraherer vi fordi vi ønsker vi at
-bruge som en predictor senere. Til sidst bruger vi bind_rows() for at få
-dem ind i den tibble vi startede med at initialisere.
+TV-kanal-data hentes fra billedtitler (img[title]) og matches med rækkerne i tabellen. Kolonnenavne standardiseres med clean_names() fra janitor, og tilskuerantal renses for punktummer og omdannes til numerisk. Runde-nummeret hentes fra tabelens header. Til sidst kombineres alle tabeller med bind_rows().
 
 ```{r Superstats}
 min_url <- "https://superstats.dk/program?season="
@@ -1445,6 +1416,17 @@ tryCatch({
 
 #### Hentning af data fra Danmarks Statistik
 
+Vi henter befolkningsdata for Viborg Kommune fra Danmarks Statistik via JSON-stat API. Data håndteres forskelligt afhængigt af år:
+
+2002–2004 summeres kommuner, da grænserne var anderledes.
+
+2005–2007 hentes som årstal.
+
+Efter 2008 hentes kvartalsdata.
+
+Datasættene kombineres til én tibble viborg_befolkning_komplet og sorteres kronologisk.
+
+
 ```{r Danmarks-Statistik}
 # ---- HENT BEFOLKNINGSDATA FRA DANMARKS STATISTIK ---- #
 # Definer URLs
@@ -1501,8 +1483,7 @@ viborg_befolkning_komplet <- bind_rows(
 
 #### Hente data fra nager.at og gør dem tidy
 
-Data hentes fra nager.at ved at indsætte sæson_år fra tidligere, så får
-vi de år hvor VFF er i superligaen.
+Vi henter offentlige helligdage for VFFs Superliga-sæsoner. Data renses og gemmes i en tibble alle_helligdage.
 
 ```{r Date.nager.at}
 
@@ -1520,6 +1501,22 @@ for (year in sæson_år) {
 ```
 
 #### Data rensning og tilføjelse af meta-data.
+
+Kampdata renses og tilpasses til analyse:
+
+- Dato og tid opdeles i separate kolonner.
+
+- Vi filtrerer kun VFFs hjemmekampe med kendt tilskuerantal.
+
+- Sæson og år beregnes korrekt, da sæsonen starter i juli og slutter året efter.
+
+- Tidspunkt kategoriseres som tidligt, midt eller sent på dagen.
+
+- Score-data opdeles i VFFs score og modstanderens score.
+
+- Variabler for tidligere kampresultater tilføjes (seneste_kamp og vff_vundet_2).
+
+- Helligdage og befolkningsdata integreres.
 
 ```{r Data-rensning}
 
@@ -1731,6 +1728,8 @@ wide_data <- all_data %>%
 
 #### Hente vffkort01 fra Bjarne, load .rds filer
 
+Alle datasæt gemmes som .rds-filer, hvilket gør det nemt at loade dem igen uden at skulle hente dem fra nettet hver gang.
+
 ```{r vffkort01-bjarne}
 
 #### gem og load RDS
@@ -1780,6 +1779,8 @@ viborg_befolkning_komplet <- viborg_befolkning_komplet %>%
 ```
 
 #### RSQLight
+
+Datasæt uploades til SQLite for at kombinere tabellerne med SQL-joins. Dette gør det muligt at kombinere kampdata, vejrdata, befolkningstal, helligdage og billetdata til ét samlet datasæt.
 
 ```{r RSQLight-joins}
 
@@ -1853,6 +1854,21 @@ dbDisconnect(con)
 ```
 
 #### Download joinet datasæt, formatér behørigt, og gør data klar til preprocessing
+
+Det joinede datasæt renses yderligere:
+
+- Faktorer for ugedag, tidsgruppe og seneste kamp oprettes.
+
+- Regn opdeles i kategorier: ingen, lidt og meget.
+
+- Runde konverteres til numerisk.
+
+- Akkumuleret befolkning beregnes.
+
+- Billetsalg opdeles i 3, 7 og 10 dage før kamp.
+
+- Ferier og helligdage flagges.
+
 
 ```{r Formater}
 
@@ -1941,6 +1957,9 @@ saveRDS(joined_data, "data/joined_data_clean.rds")
 
 #### Preprocess - dan flere variabler og lav ét datasæt uden missing med en række for hver hjemmekamp, og fjern alle variabler, som ikke skal indgå i
 
+Vi skaber fire datasæt med forskellige tidspunkter før kamp (ingen billetsalg, 10, 7 og 3 dage før). Alle datasæt renses for missing values og relevante variabler vælges til modellerne.
+
+
 ```{r Preprocess}
 
 # Indlæs data fra data_cleaning.R script
@@ -1981,6 +2000,21 @@ glimpse(vff_3)
 ```
 
 ### Modellering - funktion til at køre lineær regression, best subset selection, ridge/lasso regression og PCR/PLS
+
+Vi definerer en funktion run_all_models() til at køre:
+
+- Lineær regression
+
+- Best subset selection
+
+- Ridge og Lasso regression
+
+- Principal Component Regression (PCR)
+
+- Partial Least Squares (PLS)
+
+Funktionen splitter data i trænings- og test-set, kører modellerne og returnerer RMSE, CV-RMSE og modelkoefficienter.
+
 
 ```{r Modellering}
 
@@ -2167,84 +2201,55 @@ results_3
 
 #### Sammenlign på validation de forskellige MSE fra hver model
 
-Sammenligning på RMSE på modellerne i results_tilskuere, som er uden
-billetsalg.
+Vi har sammenlignet modellerne uden billetsalg (results_tilskuere) på test-RMSE:
 
-Den lineære funktion har test RMSE på 1164 Best subset selection - Test
-RMSE på 1418 Lasso - Test RMSE på 1176 Ridge regression - Test RMSE på
-1171 PCR - Test RMSE på 1291 PLS - Test RMSE på 1170
+- Lineær regression: 1164
 
-Den lineære regression klarer sig bedst. Men Ridge, Lasso og PLS ligger
-også tæt på. Med en anden seed kunne de godt bytte plads.
+- Best subset selection: 1418
 
-Lasso og Ridge skrumper nogle af koefficienterne, men det ligner at der
-ikke er nogen stærk multikollinearitet eller unødvendige variabler.
+- Lasso: 1176
 
-Best subset selection har en højere test_RMSE på 1418, Det kan muligvis
-tyde på overfitting da vi ikke har tilstrækkeligt nok data.
+- Ridge regression: 1171
 
-PCR klarer sig heller ikke så godt - det kan tyde på overfitting
+- PCR: 1291
 
-results_10, results_7, results_3 RMSE værdierne falder gradvist når vi
-tilføjer de stærke predictors som er billetsalg. Alle modellerne ligger
-tæt på hinanden, men PCR bliver lidt højere end de andre.
+- PLS: 1170
+
+Den lineære regression klarer sig bedst, mens Ridge, Lasso og PLS ligger tæt på. Lasso og Ridge reducerer nogle af koefficienterne, men der er ikke tegn på stærk multikollinearitet eller unødvendige variabler. Best subset selection har en højere test-RMSE, hvilket kan tyde på overfitting, sandsynligvis fordi vi har begrænset data. PCR klarer sig heller ikke optimalt, hvilket også kan være et tegn på overfitting.
+
+Når vi inkluderer billetsalg fra op til 10, 7 og 3 dage før kamp, falder RMSE gradvist for alle modeller. Det viser tydeligt, at billetsalg er en stærk forklarende faktor. PCR bliver lidt ustabil, hvilket kan skyldes sensitivitet over for overfitting.
+
 
 ### Evaluering
 
-Vi vælger den lineære model til at predict worst case og best case, da
-den er simplest og har sammen med PLS og Lasso den laveste test_RMSE.
+På baggrund af test-RMSE vælger vi den lineære model til at lave prediktioner for best-case og worst-case scenarier, da den er simpel og samtidig blandt de modeller med lavest fejl. Best subset selection viser højere test-RMSE, hvilket understøtter, at kompleksiteten ikke altid giver bedre performance med små datasæt. Ridge, Lasso og PLS ligger tæt på lineær regression, og deres koefficientreduktioner kan give en smule robusthed, men ændrer ikke det generelle billede.
 
-Til interviewet fik vi fortalt at vejret ikke havde så stor betydning,
-men i vores model har regn_gruppe_meget_regn en stor betydning. Vi har
-ikke mange data over fodboldkampe der er spillet med meget regn, så det
-kan være en tilfældighed. Men det giver mening at mindre kommer til
-kampen når der er høj regn.
+Vejrvariabler som “meget regn” har en mærkbar effekt, men det kan være tilfældigt, da vi har få observationer med kraftig regn. Akkumuleret befolkning har minimal effekt i modellen uden billetsalg.
 
-Akk_indbyggertal burde have en positiv indflydelse på tilskuere, men den
-har næsten ingen effekt på modellen, den ligger på -0,38 på modellen
-uden billetsalg. Den er måske skubbet i den negative retning på grund af
-andre predictors i datasættet.
 
 #### Hvordan er Test-RMSE sammenlignet med CV-RMSE
 
-results_tilskuere: Best subset selection - Test RMSE på 1418 og CV RMSE
-på 1434. De ligger ret tæt på hinanden Ridge regression - Test RMSE på
-1171 og CV RMSE på 1306. Test RMSE ligger tydeligt lavere, det kunne
-skyldes at vi ikke har ret meget data at teste på, og det giver en lidt
-heldig split som passer modellen bedre. Lasso - Test RMSE på 1176 og CV
-RMSE på 1282. Minder om Ridge tilfældet PCR - Test RMSE på 1291 og CV
-RMSE på 1344. Tæt på hinanden, test lidt lavere PLS - Test RMSE på 1170
-og CV RMSE på 1329. Minder også om Ridge tilfældet
+For modelsættet uden billetsalg ser vi, at CV-RMSE generelt ligger lidt højere end test-RMSE:
 
-CV_RMSE ligger generelt lidt højere end test RMSE - det kan tyde på test
-sættet er lidt lettere end træningsdatasættet. Vi tænker det skyldes en
-tilfældighed pga. en lille sample size.
+- Best subset selection: Test RMSE 1418, CV RMSE 1434
 
-results_10, results_7, results_3 Når vi inkluderer billetsalg fra op til
-10 dage før kampen, falder fejlene mere og mere. Best subset selection,
-Lasso og PLS klarer sig bedst og man kan vurdere billetsalg er en stærk
-predictor. Ridge ligger lidt højere end de andre på test_RMSE. Dette
-sker fordi Ridge laver alle predictors tættere på 0, også den stærke
-billetsalg predictor. PCR bliver ustabil i test_RMSE - det kan tyde på
-overfitting
+- Ridge regression: Test RMSE 1171, CV RMSE 1306
+
+- Lasso: Test RMSE 1176, CV RMSE 1282
+
+- PCR: Test RMSE 1291, CV RMSE 1344
+
+- PLS: Test RMSE 1170, CV RMSE 1329
+
+Den lavere test-RMSE kan skyldes, at test-sættet er lidt lettere end træningsdatasættet, hvilket er almindeligt ved små samples og tilfældige splits. Når billetsalg inkluderes, falder RMSE markant for alle modeller, især Best subset selection, Lasso og PLS, mens Ridge ligger lidt højere, fordi den trækker alle koefficienter tættere på nul, inklusive den stærke billetsalgs-predictor.
+
 
 #### Fortolkning
 
-Vi har lige PT. kun 195 rækker data til vores modeller. Over tiden som
-VFF får spillet flere kampe i superligaen, henter vores model automatisk
-ny data fra superstats, DMI, date.nager.at og danmarks statistik, som
-kommer ind i vores datasæt og bruges i ML modellen. Derfor ændres RMSE
-værdierne over tiden, og tallene vi har vurderet på er et snapshot af
-sådan det så ud da vi kørte koden.
+Vi arbejder med et relativt lille datasæt (195 rækker), hvilket giver højere varians i modelresultaterne. Outliers i testdatasættet kan påvirke test-RMSE kraftigt, mens CV-RMSE giver et mere gennemsnitligt billede af modellens performance. Over tid vil modellen blive opdateret med nye data fra Superstats, DMI og Danmarks Statistik, hvilket vil ændre RMSE-værdierne og forbedre stabiliteten.
 
-Siden datamængden er lille, får vi højere varians. En outlier i test
-datasættet kan få test RMSE til at flyve i vejret i sammenligning med CV
-RMSE. I modsætning til det, så hvis test datasættet er lettere end
-træningsdatasættet bliver test RMSE lavere end CV RMSE.
+Billetsalg er den stærkeste forklarende faktor for tilskuerantal, og dette ses tydeligt, når RMSE falder, når den inkluderes. Vejrvariabler og tidligere resultater påvirker også fremmødet, men deres effekt kan variere afhængigt af datamængde og tilfældige observationer. Akkumuleret befolkning har kun en lille effekt.
 
-Billetsalg er den stærkeste forklarende faktor for det endelige
-tilskuertal. Det kan tydeligt ses når RMSE falder på alle modeller når
-den er inkluderet.
 
 #### Prædiktion på nye data (fx best-case/worst-case scenario for de første kampe i foråret)
 
@@ -2304,52 +2309,10 @@ print(results)
 
 #### Sammenlign resultatet med formålet med undersøgelsen.
 
-Vi kan se i best case at når vejret er godt og når VFF har vundet de
-sidste to kampe osv. så kommer der flere tilskuere til kampen. Det
-stemmer overens med formålet for at lave machine learning modellen. Den
-giver et data-drevet billede af hvor mange der kommer til kampen og kan
-være værdiskabende hvis implementeret korrekt.
+Formålet med undersøgelsen er at skabe et data-drevet estimat af forventet tilskuerantal. Prædiktionsscenarierne illustrerer dette:
+  
+- Best-case: godt vejr, VFF har vundet de sidste to kampe, stor kampgruppe, ferie – forventet højt tilskuerantal.
 
-### Ekstra visualisering til evaluering
-
-```{r Ekstra-visualisering}
-
-# ---- Ekstra: Simpel følsomhedsanalyse på temperatur og regn  ----
-temps <- seq(-2, 18, by = 2)
-preds_temp <- sapply(temps, function(t) {
-  nd <- best_case
-  nd$temperatur <- t
-  predict(lm.fit, newdata = nd)
-})
-sensitivity <- data.frame(temperatur = temps, tilskuere_est = as.numeric(preds_temp))
-print(sensitivity)
-
-# Definer en række tal akk_indbyggertal større og mindre end hvad den er i 2025
-pop_range <- seq(
-  0.8 * 10246,
-  1.2 * 10246,
-  length.out = 10
-)
-
-# Forudse tilskuere for hver akk_indbyggertal
-preds_pop <- sapply(pop_range, function(pop) {
-  nd <- best_case
-  nd$akk_indbyggertal <- pop
-  predict(lm.fit, newdata = nd)
-})
-
-# Put resultater ind i et data.frame
-sensitivity_pop <- data.frame(
-  akk_indbyggertal = pop_range,
-  tilskuere_est = as.numeric(preds_pop)
-)
-print(sensitivity_pop)
-coef(lm.fit)["akk_indbyggertal"]
-# Plot over tilksuere mod akk_indbyggertal
-plot(vff_variabler$akk_indbyggertal, vff_variabler$tilskuere,
-     xlab = "Akkumuleret indbyggertal",
-     ylab = "Tilskuere",
-     main = "Tilskuere vs Akk. indbyggertal")
-abline(lm(tilskuere ~ akk_indbyggertal, data = vff_variabler), col="red")
-
-```
+- Worst-case: kraftig vind, sne, tabte kampe, meget regn – forventet lavt tilskuerantal.
+  
+Resultaterne viser tydeligt, at under optimale forhold kommer flere tilskuerne, mens dårligt vejr og dårlig form reducerer fremmødet. Dette understøtter formålet med undersøgelsen og kan være værdifuldt for planlægning, ressourcestyring og strategiske beslutninger i VFF.
