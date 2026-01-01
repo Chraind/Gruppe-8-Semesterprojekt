@@ -85,12 +85,20 @@ Dette leder naturligt frem til følgende problemformulering.
 Hvordan kan ML-baserede forudsigelser af tilskuertal skabe
 forretningsværdi for Viborg F.F., og hvad kræver implementeringen?
 
-Underspørgsmål: 1. Hvilket datamodenhedsniveau har VFF i dag, og hvilke
-udviklingsskridt er nødvendige for at kunne implementere og anvende
-ML-modeller? 2. Hvilke faktorer (vejr, modstander, billetsalg m.v.) og
-ML-modeller giver de bedste forudsigelser? 3. Hvordan kan
-forudsigelserne bruges til at forbedre ressourceplanlægning? 4. Hvordan
-sikres det, at modellen faktisk bliver brugt i organisationen?
+Underspørgsmål:
+
+1.  Hvilket datamodenhedsniveau har VFF i dag, og hvilke
+    udviklingsskridt er nødvendige for at kunne implementere og anvende
+    ML-modeller?
+
+2.  Hvilke faktorer (vejr, modstander, billetsalg m.v.) og ML-modeller
+    giver de bedste forudsigelser?
+
+3.  Hvordan kan forudsigelserne bruges til at forbedre
+    ressourceplanlægning?
+
+4.  Hvordan sikres det, at modellen faktisk bliver brugt i
+    organisationen?
 
 ### Afgrænsning
 
@@ -106,7 +114,7 @@ undersøger noget, der kan måles og analyseres gennem tal: nemlig hvilke
 faktorer der påvirker tilskuertallet, og hvordan en ML-model kan
 forudsige det. Positivismen passer godt, da den bygger på idéen om, at
 virkeligheden består af observerbare og kvantificerbare forhold, som man
-kan finde mønstre i.
+kan finde mønstre i [@egholm_2014].
 
 ### Ontologi, epistemologi og metodologi
 
@@ -137,28 +145,37 @@ indsigter.
 ### Teorivalg og empiri
 
 Teorien om datamodenhed anvendes til at vurdere VFF’s nuværende
-datamodenhedsniveau (bilag 1), ML-teori bruges til at identificere
-vigtige faktorer og evaluere modeller, og teori om organisatorisk
-implementering bruges til at forstå forhindringer for anvendelse af ML i
-praksis (bilag 3). Empirien består af et semistruktureret interview med
-VFF samt sekundære data fra Superstats og DMI, der giver indsigt i
-klubbens eksisterende datagrundlag og faktorer, der påvirker
-tilskuertal.
+datamodenhedsniveau ([Bilag 1: Datamodenhedsanalyse](#bilag-1)),
+ML-teori bruges til at identificere vigtige faktorer og evaluere
+modeller, og teori om organisatorisk implementering anvendes til at forstå 
+forhindringer for anvendelse af ML i praksis gennem governance- og organisationsanalyse ([Bilag 4: Governance-analyse](#bilag-4)). Empirien består
+af et semistruktureret interview med VFF [@vff_interview_2025] samt sekundære data fra
+Superstats [@superstats] og DMI [@dmi2025], der giver indsigt i klubbens eksisterende
+datagrundlag og faktorer, der påvirker tilskuertal.
 
 ### Undersøgelsesdesign
 
 Projektet følger elementer fra CRISP-DM, herunder problemforståelse,
 dataklargøring og modeludvikling. Samtidigt bruger vi Data Product
 Canvas til at forstå forretningen, brugere, aktører og værdi af
-løsningen (bilag 2).
+løsningen ([Bilag 2: Data Product Canvas](#bilag-2)).
 
 ### Datatyper og metodevalg
 
 Primære data er det semistrukturerede interview med VFF. Sekundære data
 inkluderer historiske kampdata fra Superstats, vejrdata fra DMI og
-billetsalgsdata fra VFF. Analyserne inkluderer Data Product Canvas,
-PESTEL-analyse, SWOT-analyse, datamodenhedsanalyse og organisations- og
-governance-analyse (bilag 1–6). Triangulering anvendes for at sikre
+billetsalgsdata fra VFF. Analyserne inkluderer datamodenhedsanalyse
+([Bilag 1: Datamodenhedsanalyse](#bilag-1)),
+Data Product Canvas
+([Bilag 2: Data Product Canvas](#bilag-2)),
+SWOT-analyse
+([Bilag 3: SWOT-analyse](#bilag-3)),
+governance-analyse
+([Bilag 4: Governance-analyse](#bilag-4)),
+Porters Five Forces
+([Bilag 5: Porters Five Forces](#bilag-5))
+samt PESTEL-analyse
+([Bilag 6: PESTEL-analyse](#bilag-6)). Triangulering anvendes for at sikre
 validitet, og pålidelige datakilder som DMI og Superstats styrker
 reliabiliteten, mens interne VFF-data kan være præget af manglende
 standardisering. En begrænsning er det begrænsede antal hjemmekampe pr.
@@ -233,7 +250,7 @@ muligt at reducere omkostninger, mindske spild og fremme fanloyalitet,
 samtidig med at ressourcer kan planlægges mere strategisk ud fra
 forventet fremmøde.
 
-PESTEL-analysen (bilag 6) viser, at Viborg FF’s tilskuertal påvirkes af
+PESTEL-analysen ([Bilag 6: PESTEL-analyse](#bilag-6)) viser, at Viborg FF’s tilskuertal påvirkes af
 flere eksterne faktorer. Politiske og juridiske rammer som
 sikkerhedskrav og GDPR skaber strukturelle betingelser, sociale forhold
 som fankultur, modstander og kampens betydning driver efterspørgslen,
@@ -284,8 +301,91 @@ kan anvendes strategisk, skal organisationen løftes datamæssigt.
 
 ## Literaturliste
 
-::: {#refs}
-:::
+**Bøger**
+
+Egholm, L. (2014).
+*Videnskabsteori: Perspektiver på organisationer og samfund*.
+1. udg. København: Hans Reitzels Forlag.
+
+
+Bang, C.G. (2025).
+*Data-Driven Decision-Making for Business*.
+London: Routledge.
+
+
+Wickham, H., Çetinkaya-Rundel, M. & Grolemund, G. (n.d.).
+*R for Data Science* (2nd ed.).  
+Available at: https://r4ds.hadley.nz/
+(Accessed: 16 December 2025).
+  
+  
+    
+**Interview**
+
+Viborg FF (2025).
+Transskriberede interviews.  
+Available at: https://eadania.mrooms.net/mod/hsuforum/discuss.php?d=33332
+(Accessed: 16 December 2025).
+  
+  
+  
+**Artikler**
+
+‘The Use of Machine Learning for Demand Forecasting in a Volatile Market’
+(2023).
+*Supply & Demand Chain Executive* [online].  
+Available at:
+https://www.sdcexec.com/software-technology/emerging-technologies/article/22697822/intuendi-the-use-of-machine-learning-for-demand-forecasting-in-a-volatile-market
+(Accessed: 9 December 2025).
+
+
+Staff, A.T.S. (2024).
+‘The Role of Machine Learning in Demand Forecasting’.
+*ActiveTech Systems* [online].  
+Available at:
+https://activetechsystems.com/blog/machine-learning/the-role-of-machine-learning-in-demand-forecasting/
+(Accessed: 9 December 2025).
+  
+  
+  
+**Rapporter og frameworks**
+
+Alexandra Instituttet (2024).
+*Find vej i din dataindsats*.  
+Available at:
+https://alexandra.dk/wp-content/uploads/2020/09/Alexandra-Instituttet-BDBA-Find-vej-i-din-dataindsats.pdf
+(Accessed: 16 December 2025).
+
+
+INT Global (2025).
+‘5 Levels of Data Maturity: How to Assess Your Organization’.  
+Available at:
+https://intglobal.com/blogs/5-levels-of-data-maturity-2025-guide-how-to-assess-your-organization/
+(Accessed: 9 December 2025).
+  
+  
+  
+**Datakilder**
+
+Danmarks Meteorologiske Institut (DMI) (2025).
+DMI API – frie data.  
+Available at: https://www.dmi.dk/frie-data
+(Accessed: 16 December 2025).
+
+
+SuperStats (2025).
+Superligaen i tal: Fodbold, statistik, resultater og tabeller.  
+Available at: https://superstats.dk/
+(Accessed: 16 December 2025).
+
+
+Nager.at (2025).
+Worldwide public holidays.  
+Available at: https://date.nager.at/
+(Accessed: 16 December 2025).
+
+
+
 
 \newpage
 
@@ -293,11 +393,12 @@ kan anvendes strategisk, skal organisationen løftes datamæssigt.
 
 ## Bilag
 
-Link til GitHub: https://github.com/Chraind/Gruppe-8-Semesterprojekt/tree/lassedev 
+Link til GitHub:
+https://github.com/Chraind/Gruppe-8-Semesterprojekt/tree/lassedev
 
 ### Analyser
 
-#### Datamodenhedsanalyse (Alexandremodellen og 5 Levels of Data Maturity)
+#### Datamodenhedsanalyse (Alexandremodellen og 5 Levels of Data Maturity) {#bilag-1}
 
 Dataarbejdet hos VFF bearbejdes lokalt på computerne, lagres ved excel
 filer og uden særlige fælles standarder. Vi vurderer VFF til at ligge et
@@ -352,7 +453,7 @@ ses som noget teknisk.
 
 Datamodenhed viser hvor godt en organisation arbejder med data, fra
 dataindsamling, lagring, dataanalyse og brug til at træffe beslutninger.
-Datamodenhedsmodeller følger typisk fem niveauer:
+Datamodenhedsmodeller [@5Levels] følger typisk fem niveauer:
 
 Niveau 1: Ustruktureret brug af data, hvor data kun bruges til drift og
 forretning. Data ligger spredt i forskellige systemet eller siloer.
@@ -381,7 +482,7 @@ og governance automatisation. Advanceret machine learning og AI til brug
 af optimering. Begivenhedsdrevet beslutningstagelse i realtid og
 virksomhedsomfattende datakompetence.
 
-#### Data Product Canvas
+#### Data Product Canvas {#bilag-2}
 
 Udviklingen af en ML-model til forudsigelse af tilskuertal hos Viborg FF
 kan struktureres med Data Product Canvas, som giver et samlet overblik
@@ -467,7 +568,7 @@ Viborg FF både har behovet, dataene og den organisatoriske modenhed til
 at implementere et datadrevet produkt, som forbedrer forudsigelighed og
 effektivitet på tværs af klubben.
 
-#### SWOT
+#### SWOT {#bilag-3}
 
 **Styrker**
 
@@ -534,7 +635,7 @@ effektivitet på tværs af klubben.
 -   Nedrykning, store spillerudsving eller ekstraordinære begivenheder
     kan gøre tidligere data mindre relevante.
 
-#### Governance-analyse
+#### Governance-analyse {#bilag-4}
 
 Data governance er organisationens fælles regler, roller og processer
 for, hvordan data skal bruges, styres og kvalitetssikres. Det handler om
@@ -701,7 +802,7 @@ For at kunne drifte en ML-model skal klubben bevæge sig mod et højere
 niveau af data governance, hvor: - roller er defineret - data
 standardiseres - integrationer etableres - datakvalitet overvåges
 
-#### Porters Five Forces
+#### Porters Five Forces {#bilag-5}
 
 **1. Konkurrenceintensiteten blandt eksisterende udbydere**
 
@@ -804,7 +905,7 @@ præcise og datadrevne prognoser, da en ML-baseret tilskuermodel kan
 fungere som et centralt strategisk redskab til at optimere bemanding,
 kapacitet og kommercielle beslutninger i et konkurrencepræget marked.
 
-#### PESTEL
+#### PESTEL {#bilag-6}
 
 **P – Politiske forhold**
 
@@ -1110,7 +1211,7 @@ kommercielt værdifulde tilskuerprognoser.
 
 \newpage
 
-### Dataklargørelse
+### Dataklargørelse {#bilag-7}
 
 ```{r}
 #| message: false
