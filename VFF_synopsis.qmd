@@ -486,7 +486,7 @@ Available at: https://divisionsforeningen.dk/tv-aftaler
 ## Bilag
 
 Link til GitHub:
-https://github.com/Chraind/Gruppe-8-Semesterprojekt/tree/lassedev
+https://github.com/eel-hub/1.semesteropgave_VFF
 
 ### Analyser
 
